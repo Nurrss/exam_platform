@@ -7,6 +7,7 @@ const rateLimit = require('express-rate-limit');
 
 const userRoutes = require('./routes/userRoutes');
 const authRoutes = require('./routes/authRoutes');
+const sessionRoutes = require('./routes/sessionRoutes');
 
 const app = express();
 
@@ -40,6 +41,7 @@ app.get('/api/health', (req, res) => {
 // Роуты
 app.use('/api/users', userRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/sessions', sessionRoutes);
 
 app.use((err, req, res, next) => {
   console.error('❌ Server Error:', err.message);
