@@ -1,0 +1,92 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int       @id @default(autoincrement())
+  email        String    @unique
+  password     String
+  role         Role
+  refreshToken String?   
+  createdAt    DateTime  @default(now())
+
+  exams        Exam[]        @relation("TeacherExams")
+  sessions     ExamSession[] @relation("StudentSessions")
+}
+
+model Exam {
+  id           Int          @id @default(autoincrement())
+  title        String
+  description  String?
+  examPassword String       
+  createdAt    DateTime     @default(now())
+  status       ExamStatus   @default(DRAFT)
+  teacherId    Int
+  teacher      User         @relation("TeacherExams", fields: [teacherId], references: [id])
+  questions    Question[]
+  sessions     ExamSession[]
+}
+
+model Question {
+  id        Int            @id @default(autoincrement())
+  examId    Int
+  exam      Exam           @relation(fields: [examId], references: [id])
+  text      String
+  type      QuestionType
+  options   Json?
+  correct   Json?
+  answers   Answer[]       
+}
+
+model ExamSession {
+  id         Int           @id @default(autoincrement())
+  examId     Int
+  exam       Exam          @relation(fields: [examId], references: [id])
+  studentId  Int
+  student    User          @relation("StudentSessions", fields: [studentId], references: [id])
+  startedAt  DateTime?
+  finishedAt DateTime?
+  status     SessionStatus @default(PENDING)
+  answers    Answer[]
+}
+
+model Answer {
+  id         Int      @id @default(autoincrement())
+  questionId Int
+  sessionId  Int
+  response   Json
+  createdAt  DateTime @default(now())
+  question   Question    @relation(fields: [questionId], references: [id])
+  session    ExamSession @relation(fields: [sessionId], references: [id])
+
+  @@unique([sessionId, questionId])
+}
+
+enum Role {
+  ADMIN
+  TEACHER
+  STUDENT
+}
+
+enum ExamStatus {
+  DRAFT
+  PUBLISHED
+  CLOSED
+}
+
+enum QuestionType {
+  MULTIPLE_CHOICE
+  TEXT
+  TRUE_FALSE
+}
+
+enum SessionStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+}
