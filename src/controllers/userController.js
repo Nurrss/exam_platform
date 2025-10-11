@@ -3,7 +3,13 @@ const userRepository = require('../repositories/userRepository');
 exports.getAllUsers = async (req, res, next) => {
   try {
     const users = await userRepository.getAll();
-    res.json(users);
+    const safeUsers = users.map((u) => ({
+      id: u.id,
+      email: u.email,
+      role: u.role,
+      createdAt: u.createdAt,
+    }));
+    res.json(safeUsers);
   } catch (error) {
     next(error);
   }
@@ -18,7 +24,13 @@ exports.createUser = async (req, res, next) => {
     }
 
     const newUser = await userRepository.create({ email, password, role });
-    res.status(201).json(newUser);
+    const safeUser = {
+      id: newUser.id,
+      email: newUser.email,
+      role: newUser.role,
+      createdAt: newUser.createdAt,
+    };
+    res.status(201).json(safeUser);
   } catch (error) {
     next(error);
   }
