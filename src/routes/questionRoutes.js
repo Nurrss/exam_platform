@@ -2,9 +2,10 @@ const express = require('express');
 const router = express.Router();
 const questionController = require('../controllers/questionController');
 const auth = require('../middleware/authMiddleware');
-const role = require('../middleware/roleMiddleware');
+const requireRole = require('../middleware/requireRole');
 
-router.use(auth, role('TEACHER'));
+router.use(auth);
+router.use(requireRole('TEACHER'));
 
 router.post('/:examId', questionController.addQuestion);
 router.get('/:examId', questionController.getQuestions);

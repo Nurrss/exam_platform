@@ -1,9 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const sessionController = require('../controllers/sessionController');
-const authMiddleware = require('../middleware/authMiddleware');
+const auth = require('../middleware/authMiddleware');
+const requireRole = require('../middleware/requireRole');
 
-router.use(authMiddleware); // все маршруты требуют JWT
+router.use(auth);
+router.use(requireRole('STUDENT'));
 
 router.post('/join', sessionController.join);
 router.get('/:id', sessionController.getDetails);
