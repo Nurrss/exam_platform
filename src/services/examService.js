@@ -1,14 +1,15 @@
+const prisma = require('../config/prismaClient');
 const examRepository = require('../repositories/examRepository');
-const { nanoid } = require('nanoid');
 
 class ExamService {
+  generateExamCode() {
+    return Math.floor(100000 + Math.random() * 900000).toString(); // 6 цифр
+  }
+
   async createExam(title, description, teacherId) {
-    const examPassword = nanoid(6);
-    return await examRepository.create({
-      title,
-      description,
-      examPassword,
-      teacherId,
+    const examCode = this.generateExamCode();
+    return prisma.exam.create({
+      data: { title, description, teacherId, examCode },
     });
   }
 
@@ -20,15 +21,25 @@ class ExamService {
     return await examRepository.findById(examId);
   }
 
-  async updateExam(examId, teacherId, data) {
+  async updateExam(examId, user, data) {
     const exam = await examRepository.findById(examId);
     if (!exam) throw new Error('Exam not found');
-    if (exam.teacherId !== teacherId && teacherId.role !== 'ADMIN')
+
+    if (exam.teacherId !== user.id && user.role !== 'ADMIN') {
       throw new Error('Access denied');
+    }
+
     return examRepository.update(examId, data);
   }
 
-  async deleteExam(examId) {
+  async deleteExam(examId, user) {
+    const exam = await examRepository.findById(examId);
+    if (!exam) throw new Error('Exam not found');
+
+    if (exam.teacherId !== user.id && user.role !== 'ADMIN') {
+      throw new Error('Access denied');
+    }
+
     return await examRepository.delete(examId);
   }
 }
