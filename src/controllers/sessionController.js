@@ -1,92 +1,47 @@
 const sessionService = require('../services/sessionService');
+const catchAsync = require('../utils/catchAsync');
+const examRepository = require('../repositories/examRepository');
 
-class SessionController {
-  async join(req, res) {
-    try {
-      const { examPassword } = req.body;
-      const studentId = req.user.id;
-      const session = await sessionService.joinExam(studentId, examPassword);
-      res.json(session);
-    } catch (err) {
-      res.status(400).json({ error: err.message });
-    }
-  }
+exports.joinExam = catchAsync(async (req, res) => {
+  const { examCode } = req.body;
+  const session = await sessionService.joinExam(req.user.id, examCode);
+  res.status(201).json(session);
+});
 
-  async getDetails(req, res) {
-    try {
-      const sessionId = parseInt(req.params.id);
-      const studentId = req.user.id;
-      const result = await sessionService.getSessionDetails(
-        sessionId,
-        studentId
-      );
-      res.json(result);
-    } catch (err) {
-      res.status(400).json({ error: err.message });
-    }
-  }
+exports.getSessionDetails = catchAsync(async (req, res) => {
+  const session = await sessionService.getSessionDetails(
+    parseInt(req.params.id),
+    req.user.id
+  );
+  res.json(session);
+});
 
-  async saveAnswer(req, res) {
-    try {
-      const sessionId = parseInt(req.params.id);
-      const studentId = req.user.id;
-      const { questionId, response } = req.body;
-      const answer = await sessionService.saveAnswer(
-        sessionId,
-        studentId,
-        questionId,
-        response
-      );
-      res.json(answer);
-    } catch (err) {
-      res.status(400).json({ error: err.message });
-    }
-  }
+exports.saveAnswer = catchAsync(async (req, res) => {
+  const { questionId, response } = req.body;
+  const answer = await sessionService.saveAnswer(
+    parseInt(req.params.id),
+    req.user.id,
+    questionId,
+    response
+  );
+  res.status(200).json(answer);
+});
 
-  async finish(req, res) {
-    try {
-      const sessionId = parseInt(req.params.id);
-      const studentId = req.user.id;
-      const result = await sessionService.finishSession(sessionId, studentId);
-      res.json(result);
-    } catch (err) {
-      res.status(400).json({ error: err.message });
-    }
-  }
+exports.finishSession = catchAsync(async (req, res) => {
+  const result = await sessionService.finishSession(
+    parseInt(req.params.id),
+    req.user.id
+  );
+  res.json(result);
+});
 
-  async join(req, res) {
-    try {
-      const { examCode } = req.body;
-      const studentId = req.user.id;
+exports.joinByCode = catchAsync(async (req, res) => {
+  const { examCode } = req.params;
+  const userId = req.user.id;
 
-      const exam = await prisma.exam.findUnique({ where: { examCode } });
-      if (!exam) return res.status(404).json({ error: 'Exam not found' });
-      if (exam.status !== 'PUBLISHED')
-        return res.status(403).json({ error: 'Exam not available yet' });
+  const exam = await examRepository.findByCode(examCode);
+  if (!exam) return res.status(404).json({ error: 'Exam not found' });
 
-      const existing = await prisma.examSession.findFirst({
-        where: { examId: exam.id, studentId },
-      });
-      if (existing) return res.json(existing);
-
-      const session = await prisma.examSession.create({
-        data: {
-          examId: exam.id,
-          studentId,
-          status: 'ACTIVE',
-          startedAt: new Date(),
-        },
-      });
-
-      res.json({
-        message: 'Joined successfully',
-        examTitle: exam.title,
-        sessionId: session.id,
-      });
-    } catch (err) {
-      res.status(400).json({ error: err.message });
-    }
-  }
-}
-
-module.exports = new SessionController();
+  const session = await sessionService.joinExam(userId, exam.examCode);
+  res.json({ message: 'Joined exam', session });
+});

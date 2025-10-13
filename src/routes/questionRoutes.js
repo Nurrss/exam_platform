@@ -1,15 +1,32 @@
 const express = require('express');
 const router = express.Router();
+const auth = require('../middlewares/authMiddleware');
+const authorizeRoles = require('../middlewares/authorizeRoles');
 const questionController = require('../controllers/questionController');
-const auth = require('../middleware/authMiddleware');
-const requireRole = require('../middleware/requireRole');
 
-router.use(auth);
-router.use(requireRole('TEACHER'));
-
-router.post('/:examId', questionController.addQuestion);
-router.get('/:examId', questionController.getQuestions);
-router.put('/update/:questionId', questionController.updateQuestion);
-router.delete('/delete/:questionId', questionController.deleteQuestion);
+router.post(
+  '/:examId',
+  auth,
+  authorizeRoles(['TEACHER']),
+  questionController.addQuestion
+);
+router.get(
+  '/:examId',
+  auth,
+  authorizeRoles(['TEACHER']),
+  questionController.getQuestions
+);
+router.put(
+  '/:id',
+  auth,
+  authorizeRoles(['TEACHER']),
+  questionController.updateQuestion
+);
+router.delete(
+  '/:id',
+  auth,
+  authorizeRoles(['TEACHER']),
+  questionController.deleteQuestion
+);
 
 module.exports = router;

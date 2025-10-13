@@ -5,10 +5,11 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 
-const userRoutes = require('./routes/userRoutes');
 const authRoutes = require('./routes/authRoutes');
+const userRoutes = require('./routes/userRoutes');
+const examRoutes = require('./routes/examRoutes');
+const questionRoutes = require('./routes/questionRoutes');
 const sessionRoutes = require('./routes/sessionRoutes');
-const publicExamRoutes = require('./routes/publicExamRoutes');
 
 const app = express();
 
@@ -17,13 +18,15 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 app.use(helmet());
-
 app.use(
   cors({
     origin: true,
     credentials: true,
   })
 );
+
+app.use(express.json());
+app.use(cookieParser());
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -32,22 +35,21 @@ const authLimiter = rateLimit({
 });
 app.use('/api/auth', authLimiter);
 
-app.use(express.json());
-app.use(cookieParser());
-
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', uptime: process.uptime() });
 });
 
-// Роуты
-app.use('/api/users', userRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/exams', examRoutes);
+app.use('/api/questions', questionRoutes);
 app.use('/api/sessions', sessionRoutes);
-app.use('/api/exams/public', publicExamRoutes);
 
 app.use((err, req, res, next) => {
-  console.error('❌ Server Error:', err.message);
-  res.status(500).json({ error: 'Internal Server Error' });
+  console.error('❌ Server Error:', err);
+  res
+    .status(500)
+    .json({ error: 'Internal Server Error', details: err.message });
 });
 
 module.exports = app;

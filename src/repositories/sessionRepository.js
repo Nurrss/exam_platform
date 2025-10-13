@@ -1,7 +1,7 @@
 const sessionRepository = require('../repositories/sessionRepository');
 const answerRepository = require('../repositories/answerRepository');
 const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../config/prismaClient');
 const { arraysEqualAsSets } = require('../utils/gradeUtils');
 
 class SessionService {

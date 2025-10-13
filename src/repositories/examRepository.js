@@ -1,44 +1,41 @@
-const prisma = require('../config/prismaClient');
+const examService = require('../services/examService');
 
-class ExamRepository {
-  async create({ title, description, examPassword, teacherId }) {
-    return prisma.exam.create({
-      data: {
-        title,
-        description,
-        examPassword,
-        teacherId,
-      },
-    });
-  }
+exports.createExam = async (req, res, next) => {
+  const { title, description } = req.body;
+  const teacherId = req.user.id;
+  const exam = await examService.createExam(title, description, teacherId);
+  res.status(201).json(exam);
+};
 
-  async findById(id) {
-    return prisma.exam.findUnique({
-      where: { id },
-      include: { questions: true },
-    });
-  }
+exports.getExamsByTeacher = async (req, res) => {
+  const exams = await examService.getExamsByTeacher(req.user.id);
+  res.json(exams);
+};
 
-  async findAllByTeacher(teacherId) {
-    return prisma.exam.findMany({
-      where: { teacherId },
-      include: { questions: true },
-      orderBy: { createdAt: 'desc' },
-    });
-  }
+exports.getExamById = async (req, res) => {
+  const exam = await examService.getExamById(parseInt(req.params.id));
+  if (!exam) return res.status(404).json({ message: 'Exam not found' });
+  res.json(exam);
+};
 
-  async update(id, data) {
-    return prisma.exam.update({
-      where: { id },
-      data,
-    });
-  }
+exports.updateExam = async (req, res) => {
+  const user = req.user;
+  const exam = await examService.updateExam(
+    parseInt(req.params.id),
+    user,
+    req.body
+  );
+  res.json(exam);
+};
 
-  async delete(id) {
-    return prisma.exam.delete({
-      where: { id },
-    });
-  }
-}
+exports.deleteExam = async (req, res) => {
+  const user = req.user;
+  await examService.deleteExam(parseInt(req.params.id), user);
+  res.json({ message: 'Exam deleted successfully' });
+};
 
-module.exports = new ExamRepository();
+exports.findByCode = async (examCode) => {
+  return prisma.exam.findUnique({
+    where: { examCode },
+  });
+};

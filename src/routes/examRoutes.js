@@ -1,19 +1,34 @@
 const express = require('express');
 const router = express.Router();
+const auth = require('../middlewares/authMiddleware');
+const authorizeRoles = require('../middlewares/authorizeRoles');
 const examController = require('../controllers/examController');
-const auth = require('../middleware/authMiddleware');
-const requireRole = require('../middleware/requireRole');
 
-router.use(auth);
-
-router.post('/', requireRole('TEACHER'), examController.createExam);
-router.get('/my', requireRole('TEACHER'), examController.getExamsByTeacher);
+router.post('/', auth, authorizeRoles(['TEACHER']), examController.createExam);
+router.get('/my', auth, authorizeRoles(['TEACHER']), examController.getMyExams);
 router.get(
   '/:id',
-  requireRole(['TEACHER', 'ADMIN']),
+  auth,
+  authorizeRoles(['TEACHER', 'ADMIN']),
   examController.getExamById
 );
-router.patch('/:id', requireRole('TEACHER'), examController.updateExam);
-router.delete('/:id', requireRole('TEACHER'), examController.deleteExam);
+router.put(
+  '/:id',
+  auth,
+  authorizeRoles(['TEACHER']),
+  examController.updateExam
+);
+router.delete(
+  '/:id',
+  auth,
+  authorizeRoles(['TEACHER', 'ADMIN']),
+  examController.deleteExam
+);
+router.post(
+  '/join/:examCode',
+  auth,
+  authorizeRoles(['STUDENT']),
+  sessionController.joinByCode
+);
 
 module.exports = router;

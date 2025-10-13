@@ -3,7 +3,7 @@ const examRepository = require('../repositories/examRepository');
 
 class ExamService {
   generateExamCode() {
-    return Math.floor(100000 + Math.random() * 900000).toString(); // 6 цифр
+    return Math.floor(100000 + Math.random() * 900000).toString();
   }
 
   async createExam(title, description, teacherId) {
@@ -41,6 +41,10 @@ class ExamService {
     }
 
     return await examRepository.delete(examId);
+  }
+
+  async findByCode(examCode) {
+    return prisma.exam.findUnique({ where: { examCode } });
   }
 }
 
