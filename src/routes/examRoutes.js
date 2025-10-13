@@ -1,11 +1,17 @@
 const express = require('express');
 const router = express.Router();
-const auth = require('../middlewares/authMiddleware');
-const authorizeRoles = require('../middlewares/authorizeRoles');
+const auth = require('../middleware/authMiddleware');
+const authorizeRoles = require('../middleware/authorizeRoles');
 const examController = require('../controllers/examController');
+const sessionController = require('../controllers/sessionController');
 
 router.post('/', auth, authorizeRoles(['TEACHER']), examController.createExam);
-router.get('/my', auth, authorizeRoles(['TEACHER']), examController.getMyExams);
+router.get(
+  '/my',
+  auth,
+  authorizeRoles(['TEACHER']),
+  examController.getExamsByTeacher
+);
 router.get(
   '/:id',
   auth,
