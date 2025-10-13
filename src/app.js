@@ -8,6 +8,7 @@ const rateLimit = require('express-rate-limit');
 const userRoutes = require('./routes/userRoutes');
 const authRoutes = require('./routes/authRoutes');
 const sessionRoutes = require('./routes/sessionRoutes');
+const publicExamRoutes = require('./routes/publicExamRoutes');
 
 const app = express();
 
@@ -42,6 +43,7 @@ app.get('/api/health', (req, res) => {
 app.use('/api/users', userRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/sessions', sessionRoutes);
+app.use('/api/exams/public', publicExamRoutes);
 
 app.use((err, req, res, next) => {
   console.error('❌ Server Error:', err.message);

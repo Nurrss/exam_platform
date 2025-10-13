@@ -20,8 +20,12 @@ class ExamService {
     return await examRepository.findById(examId);
   }
 
-  async updateExam(examId, data) {
-    return await examRepository.update(examId, data);
+  async updateExam(examId, teacherId, data) {
+    const exam = await examRepository.findById(examId);
+    if (!exam) throw new Error('Exam not found');
+    if (exam.teacherId !== teacherId && teacherId.role !== 'ADMIN')
+      throw new Error('Access denied');
+    return examRepository.update(examId, data);
   }
 
   async deleteExam(examId) {
