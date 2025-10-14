@@ -1,4 +1,5 @@
 const authService = require('../services/authService');
+const prisma = require('../config/prismaClient');
 
 const COOKIE_NAME = process.env.REFRESH_COOKIE_NAME || 'refreshToken';
 const COOKIE_OPTIONS = {
@@ -17,10 +18,16 @@ class AuthController {
         password,
         role
       );
+
       res.cookie(COOKIE_NAME, refreshToken, COOKIE_OPTIONS);
-      res.status(201).json({ user, accessToken });
+
+      res.status(201).json({
+        success: true,
+        message: 'Регистрация успешна',
+        data: { user, accessToken },
+      });
     } catch (err) {
-      res.status(400).json({ error: err.message });
+      res.status(400).json({ success: false, message: err.message });
     }
   }
 
@@ -28,7 +35,10 @@ class AuthController {
     try {
       const userData = req.user;
       if (!userData) {
-        return res.status(401).json({ error: 'Не авторизован' });
+        return res.status(401).json({
+          success: false,
+          message: 'Не авторизован',
+        });
       }
 
       const user = await prisma.user.findUnique({
@@ -43,10 +53,16 @@ class AuthController {
         },
       });
 
-      res.json(user);
+      res.json({
+        success: true,
+        message: 'Данные текущего пользователя',
+        data: user,
+      });
     } catch (err) {
-      console.error('❌ getCurrentUser error:', err);
-      res.status(500).json({ error: 'Ошибка при получении пользователя' });
+      res.status(500).json({
+        success: false,
+        message: 'Ошибка при получении пользователя',
+      });
     }
   }
 
@@ -57,10 +73,16 @@ class AuthController {
         email,
         password
       );
+
       res.cookie(COOKIE_NAME, refreshToken, COOKIE_OPTIONS);
-      res.json({ user, accessToken });
+
+      res.json({
+        success: true,
+        message: 'Вход выполнен успешно',
+        data: { user, accessToken },
+      });
     } catch (err) {
-      res.status(400).json({ error: err.message });
+      res.status(400).json({ success: false, message: err.message });
     }
   }
 
@@ -70,10 +92,16 @@ class AuthController {
       const refreshFromBody = req.body.refreshToken;
       const token = refreshFromCookie || refreshFromBody;
       const tokens = await authService.refreshToken(token);
+
       res.cookie(COOKIE_NAME, tokens.refreshToken, COOKIE_OPTIONS);
-      res.json({ accessToken: tokens.accessToken });
+
+      res.json({
+        success: true,
+        message: 'Access token обновлён',
+        data: { accessToken: tokens.accessToken },
+      });
     } catch (err) {
-      res.status(401).json({ error: err.message });
+      res.status(401).json({ success: false, message: err.message });
     }
   }
 
@@ -83,10 +111,15 @@ class AuthController {
       if (userId) {
         await authService.logout(userId);
       }
+
       res.clearCookie(COOKIE_NAME, COOKIE_OPTIONS);
-      res.json({ message: 'Logged out' });
+
+      res.json({
+        success: true,
+        message: 'Выход выполнен успешно',
+      });
     } catch (err) {
-      res.status(400).json({ error: err.message });
+      res.status(400).json({ success: false, message: err.message });
     }
   }
 }
