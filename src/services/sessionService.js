@@ -5,76 +5,96 @@ const { arraysEqualAsSets } = require('../utils/gradeUtils');
 
 class SessionService {
   async joinExam(studentId, examCode) {
-    const exam = await prisma.exam.findUnique({ where: { examCode } });
-    if (!exam || exam.status !== 'PUBLISHED') {
-      throw new Error('Exam not found or not published');
+    try {
+      const exam = await prisma.exam.findUnique({ where: { examCode } });
+      if (!exam || exam.status !== 'PUBLISHED') {
+        throw new Error('Экзамен не найден или не опубликован');
+      }
+
+      const existing = await sessionRepository.findActiveSession(
+        studentId,
+        exam.id
+      );
+      if (existing) return existing;
+
+      return await sessionRepository.createSession(studentId, exam);
+    } catch (err) {
+      console.error('❌ [joinExam] Ошибка:', err);
+      throw new Error('Ошибка при подключении к экзамену');
     }
-
-    const existing = await sessionRepository.findActiveSession(
-      studentId,
-      exam.id
-    );
-    if (existing) return existing;
-
-    return await sessionRepository.createSession(studentId, exam);
   }
 
   async getSessionDetails(sessionId, studentId) {
-    const session = await sessionRepository.findById(sessionId);
-    if (!session) throw new Error('Session not found');
-    if (session.studentId !== studentId) throw new Error('Access denied');
+    try {
+      const session = await sessionRepository.findById(sessionId);
+      if (!session) throw new Error('Сессия не найдена');
+      if (session.studentId !== studentId) throw new Error('Доступ запрещён');
 
-    const questions = await prisma.question.findMany({
-      where: { examId: session.examId },
-      select: { id: true, text: true, type: true, options: true },
-    });
+      const questions = await prisma.question.findMany({
+        where: { examId: session.examId },
+        select: { id: true, text: true, type: true, options: true },
+      });
 
-    return { session, questions };
+      return { session, questions };
+    } catch (err) {
+      console.error('❌ [getSessionDetails] Ошибка:', err);
+      throw new Error('Ошибка при получении данных сессии');
+    }
   }
 
   async saveAnswer(sessionId, studentId, questionId, response) {
-    const session = await sessionRepository.findById(sessionId);
-    if (!session) throw new Error('Session not found');
-    if (session.studentId !== studentId) throw new Error('Access denied');
-    if (session.status !== 'ACTIVE') throw new Error('Session not active');
+    try {
+      const session = await sessionRepository.findById(sessionId);
+      if (!session) throw new Error('Сессия не найдена');
+      if (session.studentId !== studentId) throw new Error('Доступ запрещён');
+      if (session.status !== 'ACTIVE') throw new Error('Сессия не активна');
 
-    return await answerRepository.saveAnswer(sessionId, questionId, response);
+      return await answerRepository.saveAnswer(sessionId, questionId, response);
+    } catch (err) {
+      console.error('❌ [saveAnswer] Ошибка:', err);
+      throw new Error('Ошибка при сохранении ответа');
+    }
   }
 
   async finishSession(sessionId, studentId) {
-    const session = await sessionRepository.findById(sessionId);
-    if (!session) throw new Error('Session not found');
-    if (session.studentId !== studentId) throw new Error('Access denied');
+    try {
+      const session = await sessionRepository.findById(sessionId);
+      if (!session) throw new Error('Сессия не найдена');
+      if (session.studentId !== studentId) throw new Error('Доступ запрещён');
 
-    const answers = await answerRepository.findBySession(sessionId);
-    const questions = await prisma.question.findMany({
-      where: { examId: session.examId },
-      select: { id: true, correct: true },
-    });
+      const answers = await answerRepository.findBySession(sessionId);
+      const questions = await prisma.question.findMany({
+        where: { examId: session.examId },
+        select: { id: true, correct: true },
+      });
 
-    const questionMap = new Map(questions.map((q) => [q.id, q.correct]));
-    let correctCount = 0;
+      const questionMap = new Map(questions.map((q) => [q.id, q.correct]));
+      let correctCount = 0;
 
-    for (const ans of answers) {
-      const correctAnswer = questionMap.get(ans.questionId);
-      let isCorrect = false;
+      for (const ans of answers) {
+        const correctAnswer = questionMap.get(ans.questionId);
+        let isCorrect = false;
 
-      if (Array.isArray(correctAnswer)) {
-        isCorrect = arraysEqualAsSets(ans.response, correctAnswer);
-      } else {
-        isCorrect =
-          JSON.stringify(ans.response) === JSON.stringify(correctAnswer);
+        if (Array.isArray(correctAnswer)) {
+          isCorrect = arraysEqualAsSets(ans.response, correctAnswer);
+        } else {
+          isCorrect =
+            JSON.stringify(ans.response) === JSON.stringify(correctAnswer);
+        }
+
+        if (isCorrect) correctCount++;
+
+        await answerRepository.updateIsCorrect(ans.id, isCorrect);
       }
 
-      if (isCorrect) correctCount++;
-
-      await answerRepository.updateIsCorrect(ans.id, isCorrect);
+      const score = questions.length
+        ? (correctCount / questions.length) * 100
+        : 0;
+      return await sessionRepository.finishSession(sessionId, score);
+    } catch (err) {
+      console.error('❌ [finishSession] Ошибка:', err);
+      throw new Error('Ошибка при завершении сессии');
     }
-
-    const score = questions.length
-      ? (correctCount / questions.length) * 100
-      : 0;
-    return await sessionRepository.finishSession(sessionId, score);
   }
 }
 

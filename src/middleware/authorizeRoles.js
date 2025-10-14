@@ -3,12 +3,20 @@ module.exports = (roles = []) => {
 
   return (req, res, next) => {
     const user = req.user;
-    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Unauthorized: no user in request',
+      });
+    }
 
     if (user.role === 'ADMIN' || allowed.includes(user.role)) {
       return next();
     }
 
-    res.status(403).json({ error: 'Access denied' });
+    return res.status(403).json({
+      success: false,
+      message: 'Access denied: insufficient role',
+    });
   };
 };

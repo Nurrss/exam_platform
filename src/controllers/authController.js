@@ -24,6 +24,32 @@ class AuthController {
     }
   }
 
+  async getCurrentUser(req, res) {
+    try {
+      const userData = req.user;
+      if (!userData) {
+        return res.status(401).json({ error: 'Не авторизован' });
+      }
+
+      const user = await prisma.user.findUnique({
+        where: { id: userData.id },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          role: true,
+          createdAt: true,
+        },
+      });
+
+      res.json(user);
+    } catch (err) {
+      console.error('❌ getCurrentUser error:', err);
+      res.status(500).json({ error: 'Ошибка при получении пользователя' });
+    }
+  }
+
   async login(req, res) {
     try {
       const { email, password } = req.body;

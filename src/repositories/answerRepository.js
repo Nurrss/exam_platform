@@ -1,4 +1,3 @@
-const { PrismaClient } = require('@prisma/client');
 const prisma = require('../config/prismaClient');
 
 class AnswerRepository {
@@ -10,8 +9,17 @@ class AnswerRepository {
     });
   }
 
-  async getAnswersBySession(sessionId) {
-    return await prisma.answer.findMany({ where: { sessionId } });
+  async updateIsCorrect(answerId, isCorrect) {
+    return prisma.answer.update({
+      where: { id: answerId },
+      data: { isCorrect },
+    });
+  }
+
+  async findBySession(sessionId) {
+    return await prisma.answer.findMany({
+      where: { sessionId },
+    });
   }
 }
 
