@@ -9,90 +9,152 @@ const {
 const SALT_ROUNDS = parseInt(process.env.REFRESH_TOKEN_SALT_ROUNDS || '10');
 
 class AuthService {
-  async register(email, password, role = 'STUDENT') {
-    const existing = await prisma.user.findUnique({ where: { email } });
-    if (existing) throw new Error('User already exists');
+  async register(
+    email,
+    password,
+    role = 'STUDENT',
+    firstName = null,
+    lastName = null
+  ) {
+    try {
+      const existing = await prisma.user.findUnique({ where: { email } });
+      if (existing)
+        throw new Error('Пользователь с таким email уже существует');
 
-    const hashed = await bcrypt.hash(password, 10);
-    const user = await prisma.user.create({
-      data: { email, password: hashed, role },
-    });
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const user = await prisma.user.create({
+        data: { email, password: hashedPassword, role, firstName, lastName },
+      });
 
-    const payload = { id: user.id, role: user.role, email: user.email };
-    const accessToken = generateAccessToken(payload);
-    const refreshToken = generateRefreshToken(payload);
-    const hashedRefresh = await bcrypt.hash(refreshToken, SALT_ROUNDS);
+      const payload = { id: user.id, role: user.role, email: user.email };
+      const accessToken = generateAccessToken(payload);
+      const refreshToken = generateRefreshToken(payload);
+      const hashedRefresh = await bcrypt.hash(refreshToken, SALT_ROUNDS);
 
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { refreshToken: hashedRefresh },
-    });
+      await prisma.refreshToken.create({
+        data: {
+          userId: user.id,
+          token: hashedRefresh,
+          device: 'default',
+          expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        },
+      });
 
-    return {
-      user: { id: user.id, email: user.email, role: user.role },
-      accessToken,
-      refreshToken,
-    };
+      return {
+        user: {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          firstName: user.firstName,
+          lastName: user.lastName,
+        },
+        accessToken,
+        refreshToken,
+      };
+    } catch (err) {
+      console.error('❌ [register] Ошибка:', err);
+      throw new Error('Ошибка при регистрации пользователя');
+    }
   }
 
-  async login(email, password) {
-    const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) throw new Error('Invalid email or password');
+  async login(email, password, device = 'default') {
+    try {
+      const user = await prisma.user.findUnique({ where: { email } });
+      if (!user) throw new Error('Неверный email или пароль');
 
-    const valid = await bcrypt.compare(password, user.password);
-    if (!valid) throw new Error('Invalid email or password');
+      const valid = await bcrypt.compare(password, user.password);
+      if (!valid) throw new Error('Неверный email или пароль');
 
-    const payload = { id: user.id, role: user.role, email: user.email };
-    const accessToken = generateAccessToken(payload);
-    const refreshToken = generateRefreshToken(payload);
-    const hashedRefresh = await bcrypt.hash(refreshToken, SALT_ROUNDS);
+      const payload = { id: user.id, role: user.role, email: user.email };
+      const accessToken = generateAccessToken(payload);
+      const refreshToken = generateRefreshToken(payload);
+      const hashedRefresh = await bcrypt.hash(refreshToken, SALT_ROUNDS);
 
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { refreshToken: hashedRefresh },
-    });
+      await prisma.refreshToken.deleteMany({
+        where: { userId: user.id, device },
+      });
+      await prisma.refreshToken.create({
+        data: {
+          userId: user.id,
+          token: hashedRefresh,
+          device,
+          expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        },
+      });
 
-    return {
-      user: { id: user.id, email: user.email, role: user.role },
-      accessToken,
-      refreshToken,
-    };
+      return {
+        user: {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          firstName: user.firstName,
+          lastName: user.lastName,
+        },
+        accessToken,
+        refreshToken,
+      };
+    } catch (err) {
+      console.error('❌ [login] Ошибка:', err);
+      throw new Error('Ошибка при входе в систему');
+    }
   }
 
   async refreshToken(oldToken) {
-    if (!oldToken) throw new Error('No refresh token provided');
-
-    let payload;
     try {
-      payload = verifyRefreshToken(oldToken);
+      if (!oldToken) throw new Error('Refresh token отсутствует');
+
+      let payload;
+      try {
+        payload = verifyRefreshToken(oldToken);
+      } catch {
+        throw new Error('Некорректный refresh token');
+      }
+
+      const user = await prisma.user.findUnique({ where: { id: payload.id } });
+      if (!user) throw new Error('Пользователь не найден');
+
+      const tokens = await prisma.refreshToken.findMany({
+        where: { userId: user.id },
+      });
+      let matchedToken = null;
+
+      for (const t of tokens) {
+        const valid = await bcrypt.compare(oldToken, t.token);
+        if (valid) {
+          matchedToken = t;
+          break;
+        }
+      }
+
+      if (!matchedToken) throw new Error('Refresh token не найден или устарел');
+
+      const newAccess = generateAccessToken(payload);
+      const newRefresh = generateRefreshToken(payload);
+      const hashedNewRefresh = await bcrypt.hash(newRefresh, SALT_ROUNDS);
+
+      await prisma.refreshToken.update({
+        where: { id: matchedToken.id },
+        data: {
+          token: hashedNewRefresh,
+          expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        },
+      });
+
+      return { accessToken: newAccess, refreshToken: newRefresh };
     } catch (err) {
-      throw new Error('Invalid refresh token');
+      console.error('❌ [refreshToken] Ошибка:', err);
+      throw new Error('Ошибка при обновлении токена');
     }
-
-    const user = await prisma.user.findUnique({ where: { id: payload.id } });
-    if (!user || !user.refreshToken) throw new Error('Refresh token not found');
-
-    const valid = await bcrypt.compare(oldToken, user.refreshToken);
-    if (!valid) throw new Error('Refresh token mismatch');
-
-    const newPayload = { id: user.id, role: user.role, email: user.email };
-    const newAccess = generateAccessToken(newPayload);
-    const newRefresh = generateRefreshToken(newPayload);
-    const hashedNewRefresh = await bcrypt.hash(newRefresh, SALT_ROUNDS);
-
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { refreshToken: hashedNewRefresh },
-    });
-
-    return { accessToken: newAccess, refreshToken: newRefresh };
   }
 
-  async logout(userId) {
-    await prisma.user.update({
-      where: { id: userId },
-      data: { refreshToken: null },
-    });
+  async logout(userId, device = null) {
+    try {
+      const where = device ? { userId, device } : { userId };
+      await prisma.refreshToken.deleteMany({ where });
+    } catch (err) {
+      console.error('❌ [logout] Ошибка:', err);
+      throw new Error('Ошибка при выходе пользователя');
+    }
   }
 }
 

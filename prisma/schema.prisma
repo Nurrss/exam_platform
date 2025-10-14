@@ -8,22 +8,27 @@ datasource db {
 }
 
 model User {
-  id           Int       @id @default(autoincrement())
-  email        String    @unique
+  id           Int             @id @default(autoincrement())
+  email        String          @unique
   password     String
+  firstName    String
+  lastName     String?
   role         Role
-  refreshToken String?   
-  createdAt    DateTime  @default(now())
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt // 💎 автоматически обновляется при изменении
 
-  exams        Exam[]        @relation("TeacherExams")
-  sessions     ExamSession[] @relation("StudentSessions")
+  // 💡 не нужно хранить refreshToken в юзере, теперь отдельная таблица
+  refreshTokens RefreshToken[] 
+
+  exams        Exam[]          @relation("TeacherExams")
+  sessions     ExamSession[]   @relation("StudentSessions")
 }
 
 model Exam {
   id           Int          @id @default(autoincrement())
   title        String
   description  String?
-  examCode     String       @unique // <- заменили examPassword
+  examCode     String       @unique 
   createdAt    DateTime     @default(now())
   status       ExamStatus   @default(DRAFT)
   teacherId    Int
@@ -31,7 +36,6 @@ model Exam {
   questions    Question[]
   sessions     ExamSession[]
 }
-
 
 model Question {
   id        Int            @id @default(autoincrement())
@@ -41,7 +45,7 @@ model Question {
   type      QuestionType
   options   Json?
   correct   Json?
-  answers   Answer[]       
+  answers   Answer[]
 }
 
 model ExamSession {
@@ -53,21 +57,38 @@ model ExamSession {
   startedAt  DateTime?
   finishedAt DateTime?
   status     SessionStatus @default(PENDING)
-  score      Float?        // <- new
+  score      Float?
   answers    Answer[]
+
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt // 💡 удобно для статистики и логов
 }
 
 model Answer {
-  id         Int      @id @default(autoincrement())
+  id         Int          @id @default(autoincrement())
   questionId Int
   sessionId  Int
   response   Json
-  createdAt  DateTime @default(now())
-  isCorrect  Boolean?  // <- new
-  question   Question    @relation(fields: [questionId], references: [id])
-  session    ExamSession @relation(fields: [sessionId], references: [id])
+  createdAt  DateTime      @default(now())
+  isCorrect  Boolean?
+
+  question   Question      @relation(fields: [questionId], references: [id])
+  session    ExamSession   @relation(fields: [sessionId], references: [id])
 
   @@unique([sessionId, questionId])
+}
+
+model RefreshToken {
+  id         Int        @id @default(autoincrement())
+  userId     Int
+  token      String
+  device     String?    // web, mobile, desktop
+  expiresAt  DateTime
+  createdAt  DateTime   @default(now())
+
+  user       User       @relation(fields: [userId], references: [id])
+
+  @@index([userId])     // 💡 для быстрых выборок при logout
 }
 
 enum Role {
