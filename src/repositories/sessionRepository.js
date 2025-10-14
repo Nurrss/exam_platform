@@ -1,62 +1,61 @@
 const prisma = require('../config/prismaClient');
 
 class SessionRepository {
-  async createSession(studentId, exam) {
-    try {
-      return await prisma.examSession.create({
-        data: {
-          studentId,
-          examId: exam.id,
-          status: 'ACTIVE',
-          startedAt: new Date(),
-        },
-        include: { exam: true },
-      });
-    } catch (err) {
-      console.error('❌ Error in createSession:', err);
-      throw new Error('Ошибка при создании сессии');
-    }
+  async create(data) {
+    return prisma.examSession.create({ data });
   }
 
-  async findActiveSession(studentId, examId) {
-    try {
-      return await prisma.examSession.findFirst({
-        where: { studentId, examId, status: 'ACTIVE' },
-        include: { exam: true },
-      });
-    } catch (err) {
-      console.error('❌ Error in findActiveSession:', err);
-      throw new Error('Ошибка при поиске активной сессии');
-    }
+  async findByStudent(studentId) {
+    return prisma.examSession.findMany({
+      where: { studentId },
+      include: { exam: true },
+    });
   }
 
-  async findById(sessionId) {
-    try {
-      return await prisma.examSession.findUnique({
-        where: { id: sessionId },
-        include: { exam: true },
-      });
-    } catch (err) {
-      console.error('❌ Error in findById:', err);
-      throw new Error('Ошибка при поиске сессии');
-    }
+  async findById(id) {
+    return prisma.examSession.findUnique({
+      where: { id: Number(id) },
+      include: { answers: true },
+    });
   }
 
-  async finishSession(sessionId, score) {
-    try {
-      return await prisma.examSession.update({
-        where: { id: sessionId },
-        data: {
-          finishedAt: new Date(),
-          status: 'COMPLETED',
-          score,
-        },
-        include: { exam: true },
+  async submitAnswer(sessionId, questionId, response) {
+    const existing = await prisma.answer.findFirst({
+      where: { sessionId: Number(sessionId), questionId: Number(questionId) },
+    });
+
+    if (existing) {
+      return prisma.answer.update({
+        where: { id: existing.id },
+        data: { response },
       });
-    } catch (err) {
-      console.error('❌ Error in finishSession:', err);
-      throw new Error('Ошибка при завершении сессии');
     }
+
+    return prisma.answer.create({
+      data: {
+        sessionId: Number(sessionId),
+        questionId: Number(questionId),
+        response,
+      },
+    });
+  }
+
+  async findAnswers(sessionId) {
+    return prisma.answer.findMany({ where: { sessionId: Number(sessionId) } });
+  }
+
+  async update(sessionId, data) {
+    return prisma.examSession.update({
+      where: { id: Number(sessionId) },
+      data,
+    });
+  }
+
+  async findByExam(examId) {
+    return prisma.examSession.findMany({
+      where: { examId: Number(examId) },
+      include: { student: true },
+    });
   }
 }
 

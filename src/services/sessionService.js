@@ -1,100 +1,99 @@
-const prisma = require('../config/prismaClient');
 const sessionRepository = require('../repositories/sessionRepository');
-const answerRepository = require('../repositories/answerRepository');
-const { arraysEqualAsSets } = require('../utils/gradeUtils');
+const prisma = require('../config/prismaClient');
 
 class SessionService {
   async joinExam(studentId, examCode) {
-    try {
-      const exam = await prisma.exam.findUnique({ where: { examCode } });
-      if (!exam || exam.status !== 'PUBLISHED') {
-        throw new Error('Экзамен не найден или не опубликован');
-      }
+    const exam = await prisma.exam.findUnique({ where: { examCode } });
+    if (!exam) throw new Error('Экзамен не найден');
 
-      const existing = await sessionRepository.findActiveSession(
-        studentId,
-        exam.id
-      );
-      if (existing) return existing;
+    const existing = await prisma.examSession.findFirst({
+      where: { studentId, examId: exam.id },
+    });
+    if (existing) throw new Error('Вы уже присоединились к этому экзамену');
 
-      return await sessionRepository.createSession(studentId, exam);
-    } catch (err) {
-      console.error('❌ [joinExam] Ошибка:', err);
-      throw new Error('Ошибка при подключении к экзамену');
-    }
+    const session = await sessionRepository.create({
+      examId: exam.id,
+      studentId,
+      status: 'ACTIVE',
+      startedAt: new Date(),
+    });
+    return session;
   }
 
-  async getSessionDetails(sessionId, studentId) {
-    try {
-      const session = await sessionRepository.findById(sessionId);
-      if (!session) throw new Error('Сессия не найдена');
-      if (session.studentId !== studentId) throw new Error('Доступ запрещён');
+  async getMySessions(studentId) {
+    return sessionRepository.findByStudent(studentId);
+  }
 
-      const questions = await prisma.question.findMany({
-        where: { examId: session.examId },
-        select: { id: true, text: true, type: true, options: true },
+  async getSessionById(sessionId, user) {
+    const session = await sessionRepository.findById(sessionId);
+    if (!session) throw new Error('Сессия не найдена');
+
+    if (user.role === 'STUDENT' && session.studentId !== user.id)
+      throw new Error('Нет доступа к этой сессии');
+
+    return session;
+  }
+
+  async submitAnswer(sessionId, studentId, { questionId, response }) {
+    const session = await sessionRepository.findById(sessionId);
+    if (!session) throw new Error('Сессия не найдена');
+    if (session.studentId !== studentId) throw new Error('Нет доступа');
+
+    const answer = await sessionRepository.submitAnswer(
+      sessionId,
+      questionId,
+      response
+    );
+    return answer;
+  }
+
+  async finishExam(sessionId, studentId) {
+    const session = await sessionRepository.findById(sessionId);
+    if (!session) throw new Error('Сессия не найдена');
+    if (session.studentId !== studentId) throw new Error('Нет доступа');
+
+    const answers = await sessionRepository.findAnswers(sessionId);
+
+    let score = 0;
+    for (const ans of answers) {
+      const question = await prisma.question.findUnique({
+        where: { id: ans.questionId },
       });
-
-      return { session, questions };
-    } catch (err) {
-      console.error('❌ [getSessionDetails] Ошибка:', err);
-      throw new Error('Ошибка при получении данных сессии');
-    }
-  }
-
-  async saveAnswer(sessionId, studentId, questionId, response) {
-    try {
-      const session = await sessionRepository.findById(sessionId);
-      if (!session) throw new Error('Сессия не найдена');
-      if (session.studentId !== studentId) throw new Error('Доступ запрещён');
-      if (session.status !== 'ACTIVE') throw new Error('Сессия не активна');
-
-      return await answerRepository.saveAnswer(sessionId, questionId, response);
-    } catch (err) {
-      console.error('❌ [saveAnswer] Ошибка:', err);
-      throw new Error('Ошибка при сохранении ответа');
-    }
-  }
-
-  async finishSession(sessionId, studentId) {
-    try {
-      const session = await sessionRepository.findById(sessionId);
-      if (!session) throw new Error('Сессия не найдена');
-      if (session.studentId !== studentId) throw new Error('Доступ запрещён');
-
-      const answers = await answerRepository.findBySession(sessionId);
-      const questions = await prisma.question.findMany({
-        where: { examId: session.examId },
-        select: { id: true, correct: true },
-      });
-
-      const questionMap = new Map(questions.map((q) => [q.id, q.correct]));
-      let correctCount = 0;
-
-      for (const ans of answers) {
-        const correctAnswer = questionMap.get(ans.questionId);
-        let isCorrect = false;
-
-        if (Array.isArray(correctAnswer)) {
-          isCorrect = arraysEqualAsSets(ans.response, correctAnswer);
-        } else {
-          isCorrect =
-            JSON.stringify(ans.response) === JSON.stringify(correctAnswer);
-        }
-
-        if (isCorrect) correctCount++;
-
-        await answerRepository.updateIsCorrect(ans.id, isCorrect);
+      if (
+        question.correct &&
+        JSON.stringify(ans.response) === JSON.stringify(question.correct)
+      ) {
+        score += 1;
       }
-
-      const score = questions.length
-        ? (correctCount / questions.length) * 100
-        : 0;
-      return await sessionRepository.finishSession(sessionId, score);
-    } catch (err) {
-      console.error('❌ [finishSession] Ошибка:', err);
-      throw new Error('Ошибка при завершении сессии');
     }
+
+    return sessionRepository.update(sessionId, {
+      status: 'COMPLETED',
+      finishedAt: new Date(),
+      score,
+    });
+  }
+
+  async getResult(sessionId, user) {
+    const session = await sessionRepository.findById(sessionId);
+    if (!session) throw new Error('Сессия не найдена');
+
+    if (user.role === 'STUDENT' && session.studentId !== user.id)
+      throw new Error('Нет доступа к результату');
+
+    return session;
+  }
+
+  async getExamSessions(examId, user) {
+    const exam = await prisma.exam.findUnique({
+      where: { id: Number(examId) },
+    });
+    if (!exam) throw new Error('Экзамен не найден');
+
+    if (user.role !== 'ADMIN' && exam.teacherId !== user.id)
+      throw new Error('Нет доступа к сессиям');
+
+    return sessionRepository.findByExam(examId);
   }
 }
 
