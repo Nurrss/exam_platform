@@ -1,31 +1,41 @@
 const express = require('express');
 const router = express.Router();
-const auth = require('../middleware/authMiddleware');
-const authorizeRoles = require('../middleware/authorizeRoles');
 const questionController = require('../controllers/questionController');
+const authMiddleware = require('../middleware/authMiddleware');
+const authorize = require('../middleware/authorize');
 
 router.post(
   '/:examId',
-  auth,
-  authorizeRoles(['TEACHER']),
-  questionController.addQuestion
+  authMiddleware,
+  authorize(['TEACHER', 'ADMIN']),
+  questionController.createQuestion
 );
+
 router.get(
   '/:examId',
-  auth,
-  authorizeRoles(['TEACHER']),
-  questionController.getQuestions
+  authMiddleware,
+  authorize(['TEACHER', 'ADMIN']),
+  questionController.getQuestionsByExam
 );
+
+router.get(
+  '/:examId/student',
+  authMiddleware,
+  authorize(['STUDENT']),
+  questionController.getQuestionsForStudent
+);
+
 router.put(
   '/:id',
-  auth,
-  authorizeRoles(['TEACHER']),
+  authMiddleware,
+  authorize(['TEACHER', 'ADMIN']),
   questionController.updateQuestion
 );
+
 router.delete(
   '/:id',
-  auth,
-  authorizeRoles(['TEACHER']),
+  authMiddleware,
+  authorize(['TEACHER', 'ADMIN']),
   questionController.deleteQuestion
 );
 

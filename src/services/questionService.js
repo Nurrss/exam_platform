@@ -1,71 +1,74 @@
 const questionRepository = require('../repositories/questionRepository');
-const examRepository = require('../repositories/examRepository');
+const prisma = require('../config/prismaClient');
 
 class QuestionService {
-  async addQuestion(examId, teacherId, text, type, options, correct) {
-    try {
-      const exam = await examRepository.findById(examId);
-      if (!exam) throw new Error('Экзамен не найден');
-      if (exam.teacherId !== teacherId)
-        throw new Error('Доступ запрещён: это не ваш экзамен');
+  async createQuestion(examId, user, data) {
+    const exam = await prisma.exam.findUnique({
+      where: { id: Number(examId) },
+    });
+    if (!exam) throw new Error('Экзамен не найден');
 
-      return await questionRepository.create(
-        examId,
-        text,
-        type,
-        options,
-        correct
-      );
-    } catch (err) {
-      console.error('❌ [addQuestion] Ошибка:', err);
-      throw new Error('Ошибка при добавлении вопроса');
-    }
+    if (user.role !== 'ADMIN' && exam.teacherId !== user.id)
+      throw new Error('Нет прав для добавления вопросов');
+
+    return questionRepository.create({ ...data, examId: Number(examId) });
   }
 
-  async getQuestions(examId, teacherId) {
-    try {
-      const exam = await examRepository.findById(examId);
-      if (!exam) throw new Error('Экзамен не найден');
-      if (exam.teacherId !== teacherId)
-        throw new Error('Доступ запрещён: это не ваш экзамен');
+  async getQuestionsByExam(examId, user) {
+    const exam = await prisma.exam.findUnique({
+      where: { id: Number(examId) },
+    });
+    if (!exam) throw new Error('Экзамен не найден');
 
-      return await questionRepository.getByExam(examId);
-    } catch (err) {
-      console.error('❌ [getQuestions] Ошибка:', err);
-      throw new Error('Ошибка при получении списка вопросов');
-    }
+    if (user.role !== 'ADMIN' && exam.teacherId !== user.id)
+      throw new Error('Нет прав для просмотра вопросов');
+
+    return questionRepository.findByExam(Number(examId));
   }
 
-  async updateQuestion(questionId, teacherId, data) {
-    try {
-      const question = await questionRepository.getById(questionId);
-      if (!question) throw new Error('Вопрос не найден');
+  async getQuestionsForStudent(examId) {
+    const exam = await prisma.exam.findUnique({
+      where: { id: Number(examId) },
+    });
+    if (!exam) throw new Error('Экзамен не найден');
 
-      const exam = await examRepository.findById(question.examId);
-      if (exam.teacherId !== teacherId)
-        throw new Error('Доступ запрещён: это не ваш экзамен');
-
-      return await questionRepository.update(questionId, data);
-    } catch (err) {
-      console.error('❌ [updateQuestion] Ошибка:', err);
-      throw new Error('Ошибка при обновлении вопроса');
-    }
+    const questions = await questionRepository.findByExam(Number(examId));
+    // Убираем правильные ответы
+    return questions.map((q) => ({
+      id: q.id,
+      examId: q.examId,
+      text: q.text,
+      type: q.type,
+      options: q.options,
+    }));
   }
 
-  async deleteQuestion(questionId, teacherId) {
-    try {
-      const question = await questionRepository.getById(questionId);
-      if (!question) throw new Error('Вопрос не найден');
+  async updateQuestion(id, user, data) {
+    const question = await questionRepository.findById(Number(id));
+    if (!question) throw new Error('Вопрос не найден');
 
-      const exam = await examRepository.findById(question.examId);
-      if (exam.teacherId !== teacherId)
-        throw new Error('Доступ запрещён: это не ваш экзамен');
+    const exam = await prisma.exam.findUnique({
+      where: { id: question.examId },
+    });
 
-      return await questionRepository.delete(questionId);
-    } catch (err) {
-      console.error('❌ [deleteQuestion] Ошибка:', err);
-      throw new Error('Ошибка при удалении вопроса');
-    }
+    if (user.role !== 'ADMIN' && exam.teacherId !== user.id)
+      throw new Error('Нет прав для обновления вопроса');
+
+    return questionRepository.update(Number(id), data);
+  }
+
+  async deleteQuestion(id, user) {
+    const question = await questionRepository.findById(Number(id));
+    if (!question) throw new Error('Вопрос не найден');
+
+    const exam = await prisma.exam.findUnique({
+      where: { id: question.examId },
+    });
+
+    if (user.role !== 'ADMIN' && exam.teacherId !== user.id)
+      throw new Error('Нет прав для удаления вопроса');
+
+    return questionRepository.delete(Number(id));
   }
 }
 
