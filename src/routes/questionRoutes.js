@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const questionController = require('../controllers/questionController');
 const authMiddleware = require('../middleware/authMiddleware');
-const authorize = require('../middleware/authorize');
+const authorize = require('../middleware/authorizeRoles');
 
 router.post(
   '/:examId',
