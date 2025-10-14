@@ -1,63 +1,80 @@
 const examService = require('../services/examService');
-const catchAsync = require('../utils/catchAsync');
 
-exports.createExam = catchAsync(async (req, res) => {
-  const { title, description } = req.body;
-  const teacherId = req.user.id;
-  const exam = await examService.createExam(title, description, teacherId);
+exports.createExam = async (req, res, next) => {
+  try {
+    const exam = await examService.createExam(req.user.id, req.body);
+    res.status(201).json({ success: true, data: exam });
+  } catch (err) {
+    next(err);
+  }
+};
 
-  res.status(201).json({
-    success: true,
-    message: 'Экзамен успешно создан',
-    data: exam,
-  });
-});
+exports.getMyExams = async (req, res, next) => {
+  try {
+    const exams = await examService.getMyExams(req.user.id);
+    res.json({ success: true, data: exams });
+  } catch (err) {
+    next(err);
+  }
+};
 
-exports.getExamsByTeacher = catchAsync(async (req, res) => {
-  const exams = await examService.getExamsByTeacher(req.user.id);
+exports.getExamById = async (req, res, next) => {
+  try {
+    const exam = await examService.getExamById(req.params.id, req.user);
+    res.json({ success: true, data: exam });
+  } catch (err) {
+    next(err);
+  }
+};
 
-  res.json({
-    success: true,
-    message: 'Список экзаменов преподавателя',
-    data: exams,
-  });
-});
+exports.updateExam = async (req, res, next) => {
+  try {
+    const updated = await examService.updateExam(
+      req.params.id,
+      req.user,
+      req.body
+    );
+    res.json({ success: true, data: updated });
+  } catch (err) {
+    next(err);
+  }
+};
 
-exports.getExamById = catchAsync(async (req, res) => {
-  const exam = await examService.getExamById(parseInt(req.params.id));
-  if (!exam)
-    return res
-      .status(404)
-      .json({ success: false, message: 'Экзамен не найден' });
+exports.deleteExam = async (req, res, next) => {
+  try {
+    await examService.deleteExam(req.params.id, req.user);
+    res.json({ success: true, message: 'Экзамен удалён' });
+  } catch (err) {
+    next(err);
+  }
+};
 
-  res.json({
-    success: true,
-    message: 'Информация об экзамене',
-    data: exam,
-  });
-});
+exports.joinExam = async (req, res, next) => {
+  try {
+    const session = await examService.joinExam(
+      req.user.id,
+      req.params.examCode
+    );
+    res.json({ success: true, data: session });
+  } catch (err) {
+    next(err);
+  }
+};
 
-exports.updateExam = catchAsync(async (req, res) => {
-  const user = req.user;
-  const exam = await examService.updateExam(
-    parseInt(req.params.id),
-    user,
-    req.body
-  );
+exports.getAllExams = async (req, res, next) => {
+  try {
+    const exams = await examService.getAllExams();
+    res.json({ success: true, data: exams });
+  } catch (err) {
+    next(err);
+  }
+};
 
-  res.json({
-    success: true,
-    message: 'Экзамен обновлён',
-    data: exam,
-  });
-});
-
-exports.deleteExam = catchAsync(async (req, res) => {
-  const user = req.user;
-  await examService.deleteExam(parseInt(req.params.id), user);
-
-  res.json({
-    success: true,
-    message: 'Экзамен успешно удалён',
-  });
-});
+exports.getExamByCode = async (req, res, next) => {
+  try {
+    const exam = await examService.getExamByCode(req.params.examCode);
+    res.json({ success: true, data: exam });
+  } catch (err) {
+    next(err);
+  }
+};

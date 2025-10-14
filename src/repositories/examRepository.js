@@ -1,56 +1,32 @@
 const prisma = require('../config/prismaClient');
 
 class ExamRepository {
-  async findAllByTeacher(teacherId) {
-    try {
-      return await prisma.exam.findMany({
-        where: { teacherId },
-        select: { id: true, title: true, examCode: true },
-        orderBy: { createdAt: 'desc' },
-      });
-    } catch (err) {
-      console.error('❌ Error in findAllByTeacher:', err);
-      throw new Error('Ошибка при получении экзаменов');
-    }
+  async create(data) {
+    return prisma.exam.create({ data });
+  }
+
+  async findByTeacher(teacherId) {
+    return prisma.exam.findMany({ where: { teacherId } });
   }
 
   async findById(id) {
-    try {
-      return await prisma.exam.findUnique({
-        where: { id },
-        include: { questions: true },
-      });
-    } catch (err) {
-      console.error('❌ Error in findById:', err);
-      throw new Error('Ошибка при поиске экзамена');
-    }
+    return prisma.exam.findUnique({ where: { id: Number(id) } });
   }
 
   async update(id, data) {
-    try {
-      return await prisma.exam.update({ where: { id }, data });
-    } catch (err) {
-      console.error('❌ Error in update exam:', err);
-      throw new Error('Ошибка при обновлении экзамена');
-    }
+    return prisma.exam.update({ where: { id: Number(id) }, data });
   }
 
   async delete(id) {
-    try {
-      return await prisma.exam.delete({ where: { id } });
-    } catch (err) {
-      console.error('❌ Error in delete exam:', err);
-      throw new Error('Ошибка при удалении экзамена');
-    }
+    return prisma.exam.delete({ where: { id: Number(id) } });
   }
 
   async findByCode(examCode) {
-    try {
-      return await prisma.exam.findUnique({ where: { examCode } });
-    } catch (err) {
-      console.error('❌ Error in findByCode:', err);
-      throw new Error('Ошибка при поиске экзамена по коду');
-    }
+    return prisma.exam.findUnique({ where: { examCode } });
+  }
+
+  async findAll() {
+    return prisma.exam.findMany();
   }
 }
 

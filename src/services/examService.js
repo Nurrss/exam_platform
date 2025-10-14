@@ -1,86 +1,66 @@
-const prisma = require('../config/prismaClient');
 const examRepository = require('../repositories/examRepository');
-const { nanoid } = require('nanoid');
+const prisma = require('../config/prismaClient');
 
 class ExamService {
-  generateExamCode() {
-    return nanoid(8).toUpperCase();
+  async createExam(teacherId, data) {
+    return await examRepository.create({ ...data, teacherId });
   }
 
-  async createExam(title, description, teacherId) {
-    try {
-      const examCode = this.generateExamCode();
+  async getMyExams(userId) {
+    return await examRepository.findByTeacher(userId);
+  }
 
-      const exam = await prisma.exam.create({
-        data: { title, description, teacherId, examCode },
+  async getExamById(examId, user) {
+    const exam = await examRepository.findById(examId);
+    if (!exam) throw new Error('Экзамен не найден');
+
+    if (user.role === 'STUDENT') {
+      const session = await prisma.examSession.findFirst({
+        where: { examId: exam.id, studentId: user.id },
       });
-
-      return exam;
-    } catch (err) {
-      console.error('❌ [createExam] Ошибка:', err);
-      throw new Error('Ошибка при создании экзамена');
+      if (!session) throw new Error('Нет доступа к этому экзамену');
     }
-  }
-
-  async getExamsByTeacher(teacherId) {
-    try {
-      return await examRepository.findAllByTeacher(teacherId);
-    } catch (err) {
-      console.error('❌ [getExamsByTeacher] Ошибка:', err);
-      throw new Error('Ошибка при получении списка экзаменов');
-    }
-  }
-
-  async getExamById(examId) {
-    try {
-      const exam = await examRepository.findById(examId);
-      if (!exam) throw new Error('Экзамен не найден');
-      return exam;
-    } catch (err) {
-      console.error('❌ [getExamById] Ошибка:', err);
-      throw new Error('Ошибка при получении экзамена');
-    }
+    return exam;
   }
 
   async updateExam(examId, user, data) {
-    try {
-      const exam = await examRepository.findById(examId);
-      if (!exam) throw new Error('Экзамен не найден');
+    const exam = await examRepository.findById(examId);
+    if (!exam) throw new Error('Экзамен не найден');
 
-      if (exam.teacherId !== user.id && user.role !== 'ADMIN') {
-        throw new Error('Доступ запрещён');
-      }
+    if (user.role !== 'ADMIN' && exam.teacherId !== user.id)
+      throw new Error('Нет прав для изменения экзамена');
 
-      return await examRepository.update(examId, data);
-    } catch (err) {
-      console.error('❌ [updateExam] Ошибка:', err);
-      throw new Error('Ошибка при обновлении экзамена');
-    }
+    return await examRepository.update(examId, data);
   }
 
   async deleteExam(examId, user) {
-    try {
-      const exam = await examRepository.findById(examId);
-      if (!exam) throw new Error('Экзамен не найден');
+    const exam = await examRepository.findById(examId);
+    if (!exam) throw new Error('Экзамен не найден');
 
-      if (exam.teacherId !== user.id && user.role !== 'ADMIN') {
-        throw new Error('Доступ запрещён');
-      }
+    if (user.role !== 'ADMIN' && exam.teacherId !== user.id)
+      throw new Error('Нет прав для удаления экзамена');
 
-      return await examRepository.delete(examId);
-    } catch (err) {
-      console.error('❌ [deleteExam] Ошибка:', err);
-      throw new Error('Ошибка при удалении экзамена');
-    }
+    return await examRepository.delete(examId);
   }
 
-  async findByCode(examCode) {
-    try {
-      return await prisma.exam.findUnique({ where: { examCode } });
-    } catch (err) {
-      console.error('❌ [findByCode] Ошибка:', err);
-      throw new Error('Ошибка при поиске экзамена по коду');
-    }
+  async joinExam(studentId, examCode) {
+    const exam = await examRepository.findByCode(examCode);
+    if (!exam) throw new Error('Экзамен с таким кодом не найден');
+
+    const session = await prisma.examSession.create({
+      data: { examId: exam.id, studentId },
+    });
+    return session;
+  }
+
+  async getAllExams() {
+    return await examRepository.findAll();
+  }
+
+  async getExamByCode(examCode) {
+    const exam = await examRepository.findByCode(examCode);
+    if (!exam) throw new Error('Экзамен не найден');
+    return exam;
   }
 }
 
