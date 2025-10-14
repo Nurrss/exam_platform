@@ -1,31 +1,57 @@
 const prisma = require('../config/prismaClient');
 
-exports.findAllByTeacher = async (teacherId) => {
-  return prisma.exam.findMany({
-    where: { teacherId },
-    select: {
-      id: true,
-      title: true,
-      examCode: true,
-    },
-    orderBy: { createdAt: 'desc' },
-  });
-};
+class ExamRepository {
+  async findAllByTeacher(teacherId) {
+    try {
+      return await prisma.exam.findMany({
+        where: { teacherId },
+        select: { id: true, title: true, examCode: true },
+        orderBy: { createdAt: 'desc' },
+      });
+    } catch (err) {
+      console.error('❌ Error in findAllByTeacher:', err);
+      throw new Error('Ошибка при получении экзаменов');
+    }
+  }
 
-exports.findById = async (id) => {
-  return prisma.exam.findUnique({
-    where: { id },
-    include: { questions: true },
-  });
-};
+  async findById(id) {
+    try {
+      return await prisma.exam.findUnique({
+        where: { id },
+        include: { questions: true },
+      });
+    } catch (err) {
+      console.error('❌ Error in findById:', err);
+      throw new Error('Ошибка при поиске экзамена');
+    }
+  }
 
-exports.update = async (id, data) => {
-  return prisma.exam.update({
-    where: { id },
-    data,
-  });
-};
+  async update(id, data) {
+    try {
+      return await prisma.exam.update({ where: { id }, data });
+    } catch (err) {
+      console.error('❌ Error in update exam:', err);
+      throw new Error('Ошибка при обновлении экзамена');
+    }
+  }
 
-exports.delete = async (id) => {
-  return prisma.exam.delete({ where: { id } });
-};
+  async delete(id) {
+    try {
+      return await prisma.exam.delete({ where: { id } });
+    } catch (err) {
+      console.error('❌ Error in delete exam:', err);
+      throw new Error('Ошибка при удалении экзамена');
+    }
+  }
+
+  async findByCode(examCode) {
+    try {
+      return await prisma.exam.findUnique({ where: { examCode } });
+    } catch (err) {
+      console.error('❌ Error in findByCode:', err);
+      throw new Error('Ошибка при поиске экзамена по коду');
+    }
+  }
+}
+
+module.exports = new ExamRepository();

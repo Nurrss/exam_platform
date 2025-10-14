@@ -1,5 +1,4 @@
 const authService = require('../services/authService');
-const prisma = require('../config/prismaClient');
 
 const COOKIE_NAME = process.env.REFRESH_COOKIE_NAME || 'refreshToken';
 const COOKIE_OPTIONS = {
@@ -12,57 +11,25 @@ const COOKIE_OPTIONS = {
 class AuthController {
   async register(req, res) {
     try {
-      const { email, password, role } = req.body;
-      const { user, accessToken, refreshToken } = await authService.register(
+      const { email, password, role, firstName, lastName } = req.body;
+      const userFirstName = firstName || 'Пользователь';
+      const userLastName = lastName || '';
+
+      const { user } = await authService.register(
         email,
         password,
-        role
+        role,
+        userFirstName,
+        userLastName
       );
-
-      res.cookie(COOKIE_NAME, refreshToken, COOKIE_OPTIONS);
 
       res.status(201).json({
         success: true,
-        message: 'Регистрация успешна',
-        data: { user, accessToken },
-      });
-    } catch (err) {
-      res.status(400).json({ success: false, message: err.message });
-    }
-  }
-
-  async getCurrentUser(req, res) {
-    try {
-      const userData = req.user;
-      if (!userData) {
-        return res.status(401).json({
-          success: false,
-          message: 'Не авторизован',
-        });
-      }
-
-      const user = await prisma.user.findUnique({
-        where: { id: userData.id },
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          email: true,
-          role: true,
-          createdAt: true,
-        },
-      });
-
-      res.json({
-        success: true,
-        message: 'Данные текущего пользователя',
+        message: 'Регистрация успешна, подтвердите email',
         data: user,
       });
     } catch (err) {
-      res.status(500).json({
-        success: false,
-        message: 'Ошибка при получении пользователя',
-      });
+      res.status(400).json({ success: false, message: err.message });
     }
   }
 
@@ -88,11 +55,8 @@ class AuthController {
 
   async refresh(req, res) {
     try {
-      const refreshFromCookie = req.cookies?.[COOKIE_NAME];
-      const refreshFromBody = req.body.refreshToken;
-      const token = refreshFromCookie || refreshFromBody;
+      const token = req.cookies?.[COOKIE_NAME] || req.body.refreshToken;
       const tokens = await authService.refreshToken(token);
-
       res.cookie(COOKIE_NAME, tokens.refreshToken, COOKIE_OPTIONS);
 
       res.json({
@@ -107,17 +71,51 @@ class AuthController {
 
   async logout(req, res) {
     try {
-      const userId = req.user?.id;
-      if (userId) {
-        await authService.logout(userId);
-      }
-
+      if (req.user?.id) await authService.logout(req.user.id);
       res.clearCookie(COOKIE_NAME, COOKIE_OPTIONS);
+      res.json({ success: true, message: 'Выход выполнен успешно' });
+    } catch (err) {
+      res.status(400).json({ success: false, message: err.message });
+    }
+  }
 
+  async changePassword(req, res) {
+    try {
+      const { oldPassword, newPassword } = req.body;
+      await authService.changePassword(req.user.id, oldPassword, newPassword);
+      res.json({ success: true, message: 'Пароль успешно изменён' });
+    } catch (err) {
+      res.status(400).json({ success: false, message: err.message });
+    }
+  }
+
+  async forgotPassword(req, res) {
+    try {
+      await authService.forgotPassword(req.body.email);
       res.json({
         success: true,
-        message: 'Выход выполнен успешно',
+        message: 'Ссылка для восстановления отправлена на email',
       });
+    } catch (err) {
+      res.status(400).json({ success: false, message: err.message });
+    }
+  }
+
+  async resetPassword(req, res) {
+    try {
+      const { token, newPassword } = req.body;
+      await authService.resetPassword(token, newPassword);
+      res.json({ success: true, message: 'Пароль успешно восстановлен' });
+    } catch (err) {
+      res.status(400).json({ success: false, message: err.message });
+    }
+  }
+
+  async verifyEmail(req, res) {
+    try {
+      const { token } = req.params;
+      await authService.verifyEmail(token);
+      res.json({ success: true, message: 'Email успешно подтверждён!' });
     } catch (err) {
       res.status(400).json({ success: false, message: err.message });
     }

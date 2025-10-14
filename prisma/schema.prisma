@@ -14,15 +14,18 @@ model User {
   firstName    String
   lastName     String?
   role         Role
+  isVerified   Boolean         @default(false)
+  verificationToken String?    @unique
   createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt // 💎 автоматически обновляется при изменении
+  updatedAt    DateTime        @updatedAt
 
-  // 💡 не нужно хранить refreshToken в юзере, теперь отдельная таблица
   refreshTokens RefreshToken[] 
-
   exams        Exam[]          @relation("TeacherExams")
   sessions     ExamSession[]   @relation("StudentSessions")
+  passwordResetTokens PasswordResetToken[]
 }
+
+
 
 model Exam {
   id           Int          @id @default(autoincrement())
@@ -90,6 +93,15 @@ model RefreshToken {
 
   @@index([userId])     // 💡 для быстрых выборок при logout
 }
+
+model PasswordResetToken {
+  id         Int      @id @default(autoincrement())
+  token      String   @unique
+  user       User     @relation(fields: [userId], references: [id])
+  userId     Int
+  expiresAt  DateTime
+}
+
 
 enum Role {
   ADMIN
