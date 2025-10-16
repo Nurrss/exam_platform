@@ -1,3 +1,4 @@
+const { Prisma } = require('@prisma/client');
 const sessionRepository = require('../repositories/sessionRepository');
 const prisma = require('../config/prismaClient');
 
@@ -9,19 +10,33 @@ class SessionService {
     const existing = await prisma.examSession.findFirst({
       where: { studentId, examId: exam.id },
     });
-    if (existing) throw new Error('Вы уже присоединились к этому экзамену');
+    if (existing && existing.status !== Prisma.SessionStatus.COMPLETED) {
+      throw new Error('Вы уже участвуете в этом экзамене');
+    }
 
     const session = await sessionRepository.create({
       examId: exam.id,
       studentId,
-      status: 'ACTIVE',
+      status: Prisma.SessionStatus.ACTIVE,
       startedAt: new Date(),
     });
     return session;
   }
 
   async getMySessions(studentId) {
-    return sessionRepository.findByStudent(studentId);
+    const sessions = await prisma.examSession.findMany({
+      where: { studentId },
+      include: { exam: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return sessions.map((s) => ({
+      examTitle: s.exam.title,
+      status: s.status,
+      score: s.score,
+      startedAt: s.startedAt,
+      finishedAt: s.finishedAt,
+    }));
   }
 
   async getSessionById(sessionId, user) {
@@ -39,18 +54,27 @@ class SessionService {
     if (!session) throw new Error('Сессия не найдена');
     if (session.studentId !== studentId) throw new Error('Нет доступа');
 
-    const answer = await sessionRepository.submitAnswer(
-      sessionId,
-      questionId,
-      response
-    );
-    return answer;
+    if (session.locked) {
+      throw new Error('Сессия заблокирована. Дождитесь разрешения учителя.');
+    }
+
+    if (session.lockedUntil && new Date() < new Date(session.lockedUntil)) {
+      throw new Error(
+        'Вы временно заблокированы. Подождите окончания блокировки.'
+      );
+    }
+
+    return sessionRepository.submitAnswer(sessionId, questionId, response);
   }
 
   async finishExam(sessionId, studentId) {
     const session = await sessionRepository.findById(sessionId);
     if (!session) throw new Error('Сессия не найдена');
     if (session.studentId !== studentId) throw new Error('Нет доступа');
+
+    if (session.status === Prisma.SessionStatus.COMPLETED) {
+      throw new Error('Экзамен уже завершён');
+    }
 
     const answers = await sessionRepository.findAnswers(sessionId);
 
@@ -68,7 +92,7 @@ class SessionService {
     }
 
     return sessionRepository.update(sessionId, {
-      status: 'COMPLETED',
+      status: Prisma.SessionStatus.COMPLETED,
       finishedAt: new Date(),
       score,
     });
