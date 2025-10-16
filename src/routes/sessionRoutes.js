@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const sessionController = require('../controllers/sessionController');
+const securityController = require('../controllers/securityController');
 const authMiddleware = require('../middleware/authMiddleware');
 const authorize = require('../middleware/authorizeRoles');
 
@@ -41,6 +42,27 @@ router.get(
   authMiddleware,
   authorize(['TEACHER', 'ADMIN']),
   sessionController.getExamSessions
+);
+
+router.post(
+  '/:id/violation',
+  authMiddleware,
+  authorize(['STUDENT']),
+  securityController.reportViolation
+);
+
+router.post(
+  '/:id/approve-violation',
+  authMiddleware,
+  authorize(['TEACHER', 'ADMIN']),
+  securityController.approveViolation
+);
+
+router.post(
+  '/:id/force-finish',
+  authMiddleware,
+  authorize(['TEACHER', 'ADMIN']),
+  securityController.forceFinish
 );
 
 module.exports = router;
