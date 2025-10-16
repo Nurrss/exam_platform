@@ -11,6 +11,7 @@ const userRoutes = require('./routes/userRoutes');
 const examRoutes = require('./routes/examRoutes');
 const questionRoutes = require('./routes/questionRoutes');
 const sessionRoutes = require('./routes/sessionRoutes');
+const analyticsRoutes = require('./routes/analyticsRoutes');
 
 const app = express();
 
@@ -45,6 +46,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/exams', examRoutes);
 app.use('/api/questions', questionRoutes);
 app.use('/api/sessions', sessionRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 app.use((err, req, res, next) => {
   console.error('❌ Server Error:', err);

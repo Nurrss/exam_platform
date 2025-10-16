@@ -24,7 +24,19 @@ class SessionService {
   }
 
   async getMySessions(studentId) {
-    return sessionRepository.findByStudent(studentId);
+    const sessions = await prisma.examSession.findMany({
+      where: { studentId },
+      include: { exam: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return sessions.map((s) => ({
+      examTitle: s.exam.title,
+      status: s.status,
+      score: s.score,
+      startedAt: s.startedAt,
+      finishedAt: s.finishedAt,
+    }));
   }
 
   async getSessionById(sessionId, user) {
