@@ -5,8 +5,10 @@ const cookieParser = require('cookie-parser');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
+const swaggerUi = require('swagger-ui-express');
 const { logger } = require('./config/logger');
 const requestLogger = require('./middleware/requestLogger');
+const swaggerSpec = require('./config/swagger');
 
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
@@ -47,6 +49,13 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', uptime: process.uptime() });
 });
 
+// Swagger API Documentation
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: 'Exam Platform API Docs',
+}));
+
+// API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/exams', examRoutes);
@@ -59,6 +68,7 @@ app.use((err, req, res, next) => {
   // Log error with Winston
   logger.error('Global Error Handler', {
     error: err.message,
+    errorCode: err.errorCode,
     stack: err.stack,
     url: req.originalUrl || req.url,
     method: req.method,
@@ -66,17 +76,27 @@ app.use((err, req, res, next) => {
     body: req.body,
   });
 
-  // Don't expose stack trace in production
+  // Determine status code
+  const statusCode = err.statusCode || 500;
+
+  // Build error response
   const errorResponse = {
     success: false,
-    error: err.message || 'Internal Server Error',
+    message: err.message || 'Internal Server Error',
+    errorCode: err.errorCode || 'INTERNAL_SERVER_ERROR',
   };
 
+  // Add validation errors if present
+  if (err.fields && Array.isArray(err.fields)) {
+    errorResponse.errors = err.fields;
+  }
+
+  // Don't expose stack trace in production
   if (process.env.NODE_ENV !== 'production') {
     errorResponse.stack = err.stack;
   }
 
-  res.status(err.statusCode || 500).json(errorResponse);
+  res.status(statusCode).json(errorResponse);
 });
 
 module.exports = app;

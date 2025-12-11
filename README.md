@@ -22,12 +22,17 @@ A comprehensive REST API backend for an online examination platform with role-ba
   - Unique exam codes for student access
   - Exam statuses: DRAFT, PUBLISHED, CLOSED
   - Support for multiple question types (MULTIPLE_CHOICE, TEXT, TRUE_FALSE)
+  - **Time limits:** Configure exam duration (1-600 minutes)
+  - **Attempt tracking:** Limit retakes (1-10 attempts per student)
 
 - **Exam Sessions**
   - Students can join exams using exam codes
   - Real-time answer submission
   - Automatic scoring on completion
   - Session status tracking
+  - **Auto-submit:** Sessions automatically complete when time expires
+  - **Time tracking:** Real-time remaining time calculation
+  - **Attempt validation:** Prevents joining after max attempts reached
 
 - **Security Features**
   - Violation reporting system
@@ -47,6 +52,21 @@ A comprehensive REST API backend for an online examination platform with role-ba
   - Request validation with Joi
   - Comprehensive error handling
   - Rate limiting on authentication endpoints
+  - **Structured error codes:** Standardized error responses with error codes
+  - **Database transactions:** Atomic operations for critical processes
+
+- **Logging & Monitoring**
+  - **Winston logger:** Professional logging with daily rotation
+  - **3 log streams:** Application, error, and audit logs
+  - **Request logging:** All HTTP requests logged with context
+  - **Audit trail:** Categorized event tracking for compliance
+  - **Log rotation:** Automatic cleanup with retention policies
+
+- **API Documentation**
+  - **Swagger/OpenAPI:** Interactive API documentation
+  - **Live testing:** Try API endpoints directly from browser
+  - **Schema definitions:** Complete request/response examples
+  - **Access:** Available at `/api-docs` endpoint
 
 ## Technology Stack
 
@@ -167,10 +187,31 @@ The server will start on `http://localhost:3000` (or your configured PORT).
 
 ## API Documentation
 
+### Interactive API Documentation (Swagger)
+
+Access the **interactive Swagger documentation** at:
+```
+http://localhost:3000/api-docs
+```
+
+Features:
+- Browse all API endpoints with detailed descriptions
+- View request/response schemas
+- Try API calls directly from browser
+- See authentication requirements
+- View error codes and responses
+
 ### Base URL
 ```
 http://localhost:3000/api
 ```
+
+### Quick Start with API
+
+1. **Register a user** (POST `/api/auth/register`)
+2. **Login** (POST `/api/auth/login`) - Get access token
+3. **Use token** in Authorization header: `Bearer <your_token>`
+4. **Explore endpoints** via Swagger UI or direct API calls
 
 ### Authentication Endpoints
 

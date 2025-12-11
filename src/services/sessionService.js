@@ -176,33 +176,44 @@ class SessionService {
   }
 
   async finishExam(sessionId, studentId) {
-    const session = await sessionRepository.findById(sessionId);
-    if (!session) throw new Error('Сессия не найдена');
-    if (session.studentId !== studentId) throw new Error('Нет доступа');
-
-    if (session.status === Prisma.SessionStatus.COMPLETED) {
-      throw new Error('Экзамен уже завершён');
-    }
-
-    const answers = await sessionRepository.findAnswers(sessionId);
-
-    let score = 0;
-    for (const ans of answers) {
-      const question = await prisma.question.findUnique({
-        where: { id: ans.questionId },
+    // Use transaction to ensure atomicity
+    return await prisma.$transaction(async (tx) => {
+      const session = await tx.examSession.findUnique({
+        where: { id: Number(sessionId) },
+        include: { answers: true },
       });
-      if (
-        question.correct &&
-        JSON.stringify(ans.response) === JSON.stringify(question.correct)
-      ) {
-        score += 1;
-      }
-    }
 
-    return sessionRepository.update(sessionId, {
-      status: Prisma.SessionStatus.COMPLETED,
-      finishedAt: new Date(),
-      score,
+      if (!session) throw new Error('Сессия не найдена');
+      if (session.studentId !== studentId) throw new Error('Нет доступа');
+
+      if (session.status === Prisma.SessionStatus.COMPLETED) {
+        throw new Error('Экзамен уже завершён');
+      }
+
+      const answers = session.answers;
+
+      let score = 0;
+      for (const ans of answers) {
+        const question = await tx.question.findUnique({
+          where: { id: ans.questionId },
+        });
+        if (
+          question.correct &&
+          JSON.stringify(ans.response) === JSON.stringify(question.correct)
+        ) {
+          score += 1;
+        }
+      }
+
+      // Update session with calculated score
+      return await tx.examSession.update({
+        where: { id: Number(sessionId) },
+        data: {
+          status: Prisma.SessionStatus.COMPLETED,
+          finishedAt: new Date(),
+          score,
+        },
+      });
     });
   }
 
