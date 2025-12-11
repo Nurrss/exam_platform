@@ -1,4 +1,32 @@
 const questionService = require('../services/questionService');
+const bulkImportService = require('../services/bulkImportService');
+
+exports.uploadImage = async (req, res, next) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'Файл не был загружен',
+      });
+    }
+
+    // Return the URL to access the uploaded image
+    const imageUrl = `/uploads/images/${req.file.filename}`;
+
+    res.status(200).json({
+      success: true,
+      message: 'Изображение успешно загружено',
+      data: {
+        imageUrl,
+        filename: req.file.filename,
+        size: req.file.size,
+        mimetype: req.file.mimetype,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
 
 exports.createQuestion = async (req, res, next) => {
   try {
@@ -53,6 +81,39 @@ exports.deleteQuestion = async (req, res, next) => {
   try {
     await questionService.deleteQuestion(req.params.id, req.user);
     res.json({ success: true, message: 'Вопрос удалён' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.bulkImport = async (req, res, next) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'Файл не был загружен',
+      });
+    }
+
+    const { examId } = req.params;
+    const userId = req.user.id;
+    const filePath = req.file.path;
+    const fileExtension = req.file.originalname.split('.').pop().toLowerCase();
+
+    let result;
+
+    if (fileExtension === 'csv') {
+      result = await bulkImportService.importFromCSV(filePath, examId, userId);
+    } else if (fileExtension === 'json') {
+      result = await bulkImportService.importFromJSON(filePath, examId, userId);
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: 'Недопустимый формат файла. Разрешены: CSV, JSON',
+      });
+    }
+
+    res.status(200).json(result);
   } catch (err) {
     next(err);
   }

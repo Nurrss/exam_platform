@@ -9,6 +9,10 @@ const swaggerUi = require('swagger-ui-express');
 const { logger } = require('./config/logger');
 const requestLogger = require('./middleware/requestLogger');
 const swaggerSpec = require('./config/swagger');
+const { setupSoftDeleteMiddleware } = require('./middleware/softDelete');
+
+// Setup Prisma soft delete middleware
+setupSoftDeleteMiddleware();
 
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
@@ -16,6 +20,7 @@ const examRoutes = require('./routes/examRoutes');
 const questionRoutes = require('./routes/questionRoutes');
 const sessionRoutes = require('./routes/sessionRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
+const studentRoutes = require('./routes/studentRoutes');
 
 const app = express();
 
@@ -37,6 +42,9 @@ app.use(
 
 app.use(express.json());
 app.use(cookieParser());
+
+// Serve static files (uploaded images)
+app.use('/uploads', express.static('uploads'));
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -62,6 +70,7 @@ app.use('/api/exams', examRoutes);
 app.use('/api/questions', questionRoutes);
 app.use('/api/sessions', sessionRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/students', studentRoutes);
 
 // Global error handler
 app.use((err, req, res, next) => {

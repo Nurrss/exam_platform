@@ -24,6 +24,9 @@ A comprehensive REST API backend for an online examination platform with role-ba
   - Support for multiple question types (MULTIPLE_CHOICE, TEXT, TRUE_FALSE)
   - **Time limits:** Configure exam duration (1-600 minutes)
   - **Attempt tracking:** Limit retakes (1-10 attempts per student)
+  - **Exam scheduling:** Auto-publish/close exams at specific times
+  - **Weighted scoring:** Assign point values to questions
+  - **Soft deletes:** Safe deletion with recovery capability
 
 - **Exam Sessions**
   - Students can join exams using exam codes
@@ -68,6 +71,51 @@ A comprehensive REST API backend for an online examination platform with role-ba
   - **Schema definitions:** Complete request/response examples
   - **Access:** Available at `/api-docs` endpoint
 
+### Phase 3: Advanced Features
+
+- **Exam Scheduling**
+  - **Auto-publish:** Automatically publish exams at scheduled start time
+  - **Auto-close:** Automatically close exams at scheduled end time
+  - **Force-finish:** Active sessions auto-complete when exam closes
+  - **Cron scheduler:** Background job runs every minute to check schedules
+  - **Audit logging:** All automated actions logged for compliance
+
+- **File Upload System**
+  - **Image uploads:** Add images to questions (JPEG, PNG, GIF, WebP)
+  - **Document uploads:** Bulk import via CSV/JSON files
+  - **File validation:** Type and size restrictions (5MB images, 10MB documents)
+  - **Static serving:** Uploaded files accessible via `/uploads` endpoint
+  - **Automatic cleanup:** Failed uploads cleaned up automatically
+
+- **Weighted Scoring**
+  - **Point values:** Assign custom points to each question (default: 1)
+  - **Automatic calculation:** Total score based on question weights
+  - **Percentage scores:** Normalized to percentage for consistency
+  - **Question ordering:** Control question display order
+
+- **Student Dashboard**
+  - **Performance statistics:** Total exams, average score, highest/lowest scores
+  - **Score distribution:** Breakdown by performance levels (excellent, good, average, poor)
+  - **Recent exams:** Last 5 completed exams with scores
+  - **Active sessions:** Current ongoing exams
+  - **Exam history:** Detailed history with filtering (status, date range, exam)
+  - **Performance trends:** Monthly performance tracking over time
+
+- **Bulk Import**
+  - **CSV support:** Import questions from CSV files
+  - **JSON support:** Import questions from JSON arrays
+  - **Batch processing:** Create multiple questions in one operation
+  - **Error handling:** Detailed error reporting per question
+  - **Validation:** Type checking and data validation on import
+  - **Access control:** Only exam creators/admins can import
+
+- **Soft Deletes**
+  - **Non-destructive deletion:** Records marked as deleted, not removed
+  - **Automatic filtering:** Soft-deleted records hidden from queries
+  - **Recovery capability:** Deleted records can be restored
+  - **Applies to:** Users, Exams, Questions
+  - **Prisma middleware:** Transparent soft delete handling
+
 ## Technology Stack
 
 - **Runtime:** Node.js v18+
@@ -82,6 +130,11 @@ A comprehensive REST API backend for an online examination platform with role-ba
   - CORS v2.8.5
 - **Validation:** Joi v17.13.3
 - **Email:** Nodemailer v7.0.9
+- **Logging:** Winston v3.x with daily-rotate-file
+- **API Documentation:** Swagger-UI-Express, Swagger-JSDoc
+- **File Upload:** Multer v1.4.5-lts.1
+- **Scheduling:** node-cron v3.0.3
+- **Data Processing:** csv-parser v3.0.0
 - **Development:** nodemon v3.1.10
 
 ## Prerequisites
@@ -258,6 +311,8 @@ http://localhost:3000/api
 | GET | `/questions/:examId/student` | Get questions (student view) | STUDENT |
 | PUT | `/questions/:id` | Update question | TEACHER, ADMIN |
 | DELETE | `/questions/:id` | Delete question | TEACHER, ADMIN |
+| POST | `/questions/upload/image` | Upload question image | TEACHER, ADMIN |
+| POST | `/questions/:examId/bulk-import` | Bulk import questions (CSV/JSON) | TEACHER, ADMIN |
 
 ### Session Endpoints
 
@@ -284,6 +339,14 @@ http://localhost:3000/api
 | Method | Endpoint | Description | Roles |
 |--------|----------|-------------|-------|
 | GET | `/analytics/:id` | Get exam analytics | TEACHER, ADMIN |
+
+### Student Dashboard Endpoints
+
+| Method | Endpoint | Description | Roles | Query Params |
+|--------|----------|-------------|-------|--------------|
+| GET | `/students/dashboard` | Get dashboard statistics | STUDENT | - |
+| GET | `/students/exam-history` | Get detailed exam history | STUDENT | `page`, `pageSize`, `status`, `dateFrom`, `dateTo`, `examId` |
+| GET | `/students/performance-trends` | Get performance trends | STUDENT | `months` (default: 6) |
 
 ### Pagination
 
@@ -331,7 +394,10 @@ All endpoints validate incoming requests using Joi schemas. Invalid requests ret
 exam_server/
 ├── src/
 │   ├── config/
-│   │   └── prismaClient.js         # Prisma database client
+│   │   ├── prismaClient.js         # Prisma database client
+│   │   ├── logger.js               # Winston logger configuration
+│   │   ├── swagger.js              # Swagger/OpenAPI specification
+│   │   └── multer.js               # File upload configuration
 │   ├── controllers/                # Request handlers
 │   │   ├── authController.js
 │   │   ├── examController.js
@@ -339,14 +405,18 @@ exam_server/
 │   │   ├── questionController.js
 │   │   ├── userController.js
 │   │   ├── analyticsController.js
-│   │   └── securityController.js
+│   │   ├── securityController.js
+│   │   └── studentController.js    # Student dashboard
 │   ├── services/                   # Business logic
 │   │   ├── authService.js
 │   │   ├── examService.js
 │   │   ├── sessionService.js
 │   │   ├── questionService.js
 │   │   ├── analyticsService.js
-│   │   └── securityService.js
+│   │   ├── securityService.js
+│   │   ├── studentService.js       # Dashboard & history
+│   │   ├── schedulerService.js     # Exam scheduling
+│   │   └── bulkImportService.js    # CSV/JSON import
 │   ├── repositories/               # Data access layer
 │   │   ├── userRepository.js
 │   │   ├── examRepository.js
@@ -359,11 +429,14 @@ exam_server/
 │   │   ├── sessionRoutes.js
 │   │   ├── questionRoutes.js
 │   │   ├── userRoutes.js
-│   │   └── analyticsRoutes.js
+│   │   ├── analyticsRoutes.js
+│   │   └── studentRoutes.js        # Student dashboard routes
 │   ├── middleware/
 │   │   ├── authMiddleware.js       # JWT verification
 │   │   ├── authorizeRoles.js       # Role-based access control
-│   │   └── validate.js             # Request validation
+│   │   ├── validate.js             # Request validation
+│   │   ├── requestLogger.js        # HTTP request logging
+│   │   └── softDelete.js           # Soft delete filtering
 │   ├── validations/                # Joi validation schemas
 │   │   ├── authValidation.js
 │   │   ├── userValidation.js
@@ -376,10 +449,19 @@ exam_server/
 │   │   ├── tokenUtils.js           # JWT utilities
 │   │   ├── catchAsync.js           # Async error handling
 │   │   ├── gradeUtils.js           # Grade calculations
-│   │   └── pagination.js           # Pagination utilities
+│   │   ├── pagination.js           # Pagination utilities
+│   │   ├── auditLog.js             # Audit logging
+│   │   └── errors.js               # Error classes & codes
 │   ├── app.js                      # Express app configuration
 │   ├── server.js                   # Server initialization
 │   └── index.js                    # Entry point
+├── uploads/                        # Uploaded files
+│   ├── images/                     # Question images
+│   └── documents/                  # Import files (temp)
+├── logs/                           # Application logs
+│   ├── application-*.log
+│   ├── error-*.log
+│   └── audit-*.log
 ├── prisma/
 │   ├── schema.prisma               # Database schema
 │   └── migrations/                 # Database migrations
@@ -418,17 +500,24 @@ exam_server/
 - id, email (unique), password (hashed)
 - firstName, lastName, role
 - isVerified, verificationToken
+- deletedAt (soft delete)
 - timestamps (createdAt, updatedAt)
 
 ### Exam Model
 - id, title, description
 - examCode (unique), status
+- duration (minutes), maxAttempts
+- scheduledStartTime, scheduledEndTime
 - teacherId (foreign key)
-- timestamps
+- deletedAt (soft delete)
+- timestamps (createdAt, updatedAt)
 
 ### Question Model
 - id, examId (foreign key)
 - text, type, options (JSON), correct (JSON)
+- points (weighted scoring), imageUrl
+- order (question ordering)
+- deletedAt (soft delete)
 
 ### ExamSession Model
 - id, examId, studentId (foreign keys)
@@ -448,6 +537,15 @@ Runs every 30 seconds to automatically unlock expired session locks:
 - Checks for sessions with `status = 'LOCKED'`
 - Unlocks sessions where `lockedUntil` has passed
 - Transitions status from `LOCKED` to `ACTIVE`
+- Logs all unlock actions
+
+### Exam Scheduler Service
+Runs every minute via node-cron to automate exam lifecycle:
+- **Auto-publish:** Changes DRAFT exams to PUBLISHED when `scheduledStartTime` is reached
+- **Auto-close:** Changes PUBLISHED exams to CLOSED when `scheduledEndTime` is reached
+- **Force-finish:** Completes all active sessions when exam closes
+- **Audit logging:** All automated actions logged with timestamps
+- **Error handling:** Failures logged without crashing the server
 
 ## Development
 

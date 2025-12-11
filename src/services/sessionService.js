@@ -192,18 +192,33 @@ class SessionService {
 
       const answers = session.answers;
 
-      let score = 0;
+      // Weighted scoring: accumulate points based on question.points
+      let totalScore = 0;
+      let maxPossibleScore = 0;
+
       for (const ans of answers) {
         const question = await tx.question.findUnique({
           where: { id: ans.questionId },
         });
+
+        if (!question) continue;
+
+        const questionPoints = question.points || 1; // Default to 1 if not set
+        maxPossibleScore += questionPoints;
+
+        // Check if answer is correct
         if (
           question.correct &&
           JSON.stringify(ans.response) === JSON.stringify(question.correct)
         ) {
-          score += 1;
+          totalScore += questionPoints;
         }
       }
+
+      // Calculate percentage score
+      const percentageScore = maxPossibleScore > 0
+        ? (totalScore / maxPossibleScore) * 100
+        : 0;
 
       // Update session with calculated score
       return await tx.examSession.update({
@@ -211,7 +226,7 @@ class SessionService {
         data: {
           status: Prisma.SessionStatus.COMPLETED,
           finishedAt: new Date(),
-          score,
+          score: percentageScore, // Store as percentage
         },
       });
     });
