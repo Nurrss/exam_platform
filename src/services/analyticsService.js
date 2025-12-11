@@ -4,7 +4,10 @@ class AnalyticsService {
   async getExamAnalytics(examId, user) {
     const exam = await prisma.exam.findUnique({
       where: { id: Number(examId) },
-      include: { sessions: true },
+      include: {
+        sessions: true,
+        questions: true
+      },
     });
 
     if (!exam) throw new Error('Экзамен не найден');

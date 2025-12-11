@@ -1,4 +1,5 @@
 const examService = require('../services/examService');
+const { getPaginationParams, formatPaginatedResponse } = require('../utils/pagination');
 
 exports.createExam = async (req, res, next) => {
   try {
@@ -11,8 +12,16 @@ exports.createExam = async (req, res, next) => {
 
 exports.getMyExams = async (req, res, next) => {
   try {
-    const exams = await examService.getMyExams(req.user.id);
-    res.json({ success: true, data: exams });
+    const { page, limit } = req.query;
+    const paginationParams = getPaginationParams(page, limit);
+
+    const [exams, total] = await Promise.all([
+      examService.getMyExams(req.user.id, paginationParams),
+      examService.countMyExams(req.user.id),
+    ]);
+
+    const response = formatPaginatedResponse(exams, total, page, limit);
+    res.json({ ...response, message: 'Мои экзамены' });
   } catch (err) {
     next(err);
   }
@@ -63,8 +72,22 @@ exports.joinExam = async (req, res, next) => {
 
 exports.getAllExams = async (req, res, next) => {
   try {
-    const exams = await examService.getAllExams();
-    res.json({ success: true, data: exams });
+    const { page, limit, status } = req.query;
+    const paginationParams = getPaginationParams(page, limit);
+
+    // Build where clause for filtering
+    const where = {};
+    if (status) {
+      where.status = status;
+    }
+
+    const [exams, total] = await Promise.all([
+      examService.getAllExams({ ...paginationParams, where }),
+      examService.countAllExams(where),
+    ]);
+
+    const response = formatPaginatedResponse(exams, total, page, limit);
+    res.json({ ...response, message: 'Все экзамены' });
   } catch (err) {
     next(err);
   }
