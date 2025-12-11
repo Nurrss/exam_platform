@@ -23,20 +23,22 @@ class SessionService {
     return session;
   }
 
-  async getMySessions(studentId) {
-    const sessions = await prisma.examSession.findMany({
-      where: { studentId },
-      include: { exam: true },
-      orderBy: { createdAt: 'desc' },
-    });
+  async getMySessions(studentId, paginationOptions = {}) {
+    const { skip, take } = paginationOptions;
+    const sessions = await sessionRepository.findByStudent(studentId, { skip, take });
 
     return sessions.map((s) => ({
+      id: s.id,
       examTitle: s.exam.title,
       status: s.status,
       score: s.score,
       startedAt: s.startedAt,
       finishedAt: s.finishedAt,
     }));
+  }
+
+  async countMySessions(studentId) {
+    return sessionRepository.countByStudent(studentId);
   }
 
   async getSessionById(sessionId, user) {
@@ -108,7 +110,7 @@ class SessionService {
     return session;
   }
 
-  async getExamSessions(examId, user) {
+  async getExamSessions(examId, user, paginationOptions = {}) {
     const exam = await prisma.exam.findUnique({
       where: { id: Number(examId) },
     });
@@ -117,7 +119,12 @@ class SessionService {
     if (user.role !== 'ADMIN' && exam.teacherId !== user.id)
       throw new Error('Нет доступа к сессиям');
 
-    return sessionRepository.findByExam(examId);
+    const { skip, take, where } = paginationOptions;
+    return sessionRepository.findByExam(examId, { skip, take, where });
+  }
+
+  async countExamSessions(examId, where = {}) {
+    return sessionRepository.countByExam(examId, where);
   }
 }
 

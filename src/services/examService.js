@@ -6,8 +6,13 @@ class ExamService {
     return await examRepository.create({ ...data, teacherId });
   }
 
-  async getMyExams(userId) {
-    return await examRepository.findByTeacher(userId);
+  async getMyExams(userId, paginationOptions = {}) {
+    const { skip, take } = paginationOptions;
+    return await examRepository.findByTeacher(userId, { skip, take });
+  }
+
+  async countMyExams(userId) {
+    return await examRepository.countByTeacher(userId);
   }
 
   async getExamById(examId, user) {
@@ -53,8 +58,13 @@ class ExamService {
     return session;
   }
 
-  async getAllExams() {
-    return await examRepository.findAll();
+  async getAllExams(paginationOptions = {}) {
+    const { skip, take, where } = paginationOptions;
+    return await examRepository.findAll({ skip, take, where });
+  }
+
+  async countAllExams(where = {}) {
+    return await examRepository.count(where);
   }
 
   async getExamByCode(examCode) {

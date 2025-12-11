@@ -1,9 +1,23 @@
 const userRepository = require('../repositories/userRepository');
 const bcrypt = require('bcrypt');
+const { getPaginationParams, formatPaginatedResponse } = require('../utils/pagination');
 
 exports.getAllUsers = async (req, res, next) => {
   try {
-    const users = await userRepository.getAll();
+    const { page, limit, role } = req.query;
+    const { skip, take } = getPaginationParams(page, limit);
+
+    // Build where clause for filtering
+    const where = {};
+    if (role) {
+      where.role = role;
+    }
+
+    const [users, total] = await Promise.all([
+      userRepository.getAll({ skip, take, where }),
+      userRepository.count(where),
+    ]);
+
     const safeUsers = users.map((u) => ({
       id: u.id,
       firstName: u.firstName,
@@ -13,11 +27,8 @@ exports.getAllUsers = async (req, res, next) => {
       createdAt: u.createdAt,
     }));
 
-    res.json({
-      success: true,
-      message: 'Список всех пользователей',
-      data: safeUsers,
-    });
+    const response = formatPaginatedResponse(safeUsers, total, page, limit);
+    res.json({ ...response, message: 'Список всех пользователей' });
   } catch (error) {
     next(error);
   }

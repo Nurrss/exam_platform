@@ -5,11 +5,19 @@ class SessionRepository {
     return prisma.examSession.create({ data });
   }
 
-  async findByStudent(studentId) {
+  async findByStudent(studentId, options = {}) {
+    const { skip, take } = options;
     return prisma.examSession.findMany({
       where: { studentId },
       include: { exam: true },
+      skip,
+      take,
+      orderBy: { createdAt: 'desc' },
     });
+  }
+
+  async countByStudent(studentId) {
+    return prisma.examSession.count({ where: { studentId } });
   }
 
   async findById(id) {
@@ -51,10 +59,21 @@ class SessionRepository {
     });
   }
 
-  async findByExam(examId) {
+  async findByExam(examId, options = {}) {
+    const { skip, take, where: additionalWhere } = options;
+    const where = { examId: Number(examId), ...additionalWhere };
     return prisma.examSession.findMany({
-      where: { examId: Number(examId) },
+      where,
       include: { student: true },
+      skip,
+      take,
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async countByExam(examId, additionalWhere = {}) {
+    return prisma.examSession.count({
+      where: { examId: Number(examId), ...additionalWhere },
     });
   }
 }

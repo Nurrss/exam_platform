@@ -5,8 +5,18 @@ class ExamRepository {
     return prisma.exam.create({ data });
   }
 
-  async findByTeacher(teacherId) {
-    return prisma.exam.findMany({ where: { teacherId } });
+  async findByTeacher(teacherId, options = {}) {
+    const { skip, take } = options;
+    return prisma.exam.findMany({
+      where: { teacherId },
+      skip,
+      take,
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async countByTeacher(teacherId) {
+    return prisma.exam.count({ where: { teacherId } });
   }
 
   async findById(id) {
@@ -25,8 +35,18 @@ class ExamRepository {
     return prisma.exam.findUnique({ where: { examCode } });
   }
 
-  async findAll() {
-    return prisma.exam.findMany();
+  async findAll(options = {}) {
+    const { skip, take, where } = options;
+    return prisma.exam.findMany({
+      where,
+      skip,
+      take,
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async count(where = {}) {
+    return prisma.exam.count({ where });
   }
 }
 

@@ -1,9 +1,17 @@
 const prisma = require('../config/prismaClient');
 
-exports.getAll = () => {
+exports.getAll = (options = {}) => {
+  const { skip, take, where } = options;
   return prisma.user.findMany({
+    where,
+    skip,
+    take,
     orderBy: { createdAt: 'desc' },
   });
+};
+
+exports.count = (where = {}) => {
+  return prisma.user.count({ where });
 };
 
 exports.getById = (id) => {
