@@ -11,6 +11,16 @@ const examValidation = {
       description: Joi.string().max(1000).allow('', null).messages({
         'string.max': 'Описание не должно превышать 1000 символов',
       }),
+      duration: Joi.number().integer().min(1).max(600).allow(null).messages({
+        'number.base': 'Длительность должна быть числом',
+        'number.min': 'Длительность должна быть минимум 1 минута',
+        'number.max': 'Длительность не должна превышать 600 минут (10 часов)',
+      }),
+      maxAttempts: Joi.number().integer().min(1).max(10).default(1).messages({
+        'number.base': 'Максимум попыток должно быть числом',
+        'number.min': 'Минимум 1 попытка',
+        'number.max': 'Максимум 10 попыток',
+      }),
       status: Joi.string().valid('DRAFT', 'PUBLISHED', 'CLOSED').default('DRAFT').messages({
         'any.only': 'Статус должен быть DRAFT, PUBLISHED или CLOSED',
       }),
@@ -50,6 +60,16 @@ const examValidation = {
       }),
       description: Joi.string().max(1000).allow('', null).messages({
         'string.max': 'Описание не должно превышать 1000 символов',
+      }),
+      duration: Joi.number().integer().min(1).max(600).allow(null).messages({
+        'number.base': 'Длительность должна быть числом',
+        'number.min': 'Длительность должна быть минимум 1 минута',
+        'number.max': 'Длительность не должна превышать 600 минут (10 часов)',
+      }),
+      maxAttempts: Joi.number().integer().min(1).max(10).messages({
+        'number.base': 'Максимум попыток должно быть числом',
+        'number.min': 'Минимум 1 попытка',
+        'number.max': 'Максимум 10 попыток',
       }),
       status: Joi.string().valid('DRAFT', 'PUBLISHED', 'CLOSED').messages({
         'any.only': 'Статус должен быть DRAFT, PUBLISHED или CLOSED',

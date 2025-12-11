@@ -29,7 +29,9 @@ model Exam {
   id           Int          @id @default(autoincrement())
   title        String
   description  String?
-  examCode     String       @unique 
+  examCode     String       @unique
+  duration     Int?         // Duration in minutes (null = no time limit)
+  maxAttempts  Int          @default(1) // Maximum attempts allowed per student
   createdAt    DateTime     @default(now())
   status       ExamStatus   @default(DRAFT)
   teacherId    Int

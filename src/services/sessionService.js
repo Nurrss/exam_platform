@@ -3,15 +3,76 @@ const sessionRepository = require('../repositories/sessionRepository');
 const prisma = require('../config/prismaClient');
 
 class SessionService {
+  /**
+   * Check if session time has expired
+   * @param {Object} session - Session object with exam and startedAt
+   * @returns {Boolean} true if expired
+   */
+  isSessionExpired(session) {
+    if (!session.exam.duration || !session.startedAt) {
+      return false; // No time limit or not started
+    }
+
+    const startTime = new Date(session.startedAt);
+    const currentTime = new Date();
+    const elapsedMinutes = (currentTime - startTime) / (1000 * 60);
+
+    return elapsedMinutes > session.exam.duration;
+  }
+
+  /**
+   * Get remaining time for a session in minutes
+   * @param {Object} session - Session object with exam and startedAt
+   * @returns {Number|null} Remaining minutes or null if no limit
+   */
+  getRemainingTime(session) {
+    if (!session.exam.duration || !session.startedAt) {
+      return null;
+    }
+
+    const startTime = new Date(session.startedAt);
+    const currentTime = new Date();
+    const elapsedMinutes = (currentTime - startTime) / (1000 * 60);
+    const remaining = session.exam.duration - elapsedMinutes;
+
+    return Math.max(0, Math.round(remaining));
+  }
+
   async joinExam(studentId, examCode) {
     const exam = await prisma.exam.findUnique({ where: { examCode } });
     if (!exam) throw new Error('Экзамен не найден');
 
-    const existing = await prisma.examSession.findFirst({
-      where: { studentId, examId: exam.id },
+    // Check if exam is published
+    if (exam.status !== 'PUBLISHED') {
+      throw new Error('Экзамен недоступен. Статус: ' + exam.status);
+    }
+
+    // Check for active session
+    const activeSession = await prisma.examSession.findFirst({
+      where: {
+        studentId,
+        examId: exam.id,
+        status: { in: ['ACTIVE', 'PENDING', 'LOCKED', 'BLOCKED_WAITING'] },
+      },
     });
-    if (existing && existing.status !== Prisma.SessionStatus.COMPLETED) {
+
+    if (activeSession) {
       throw new Error('Вы уже участвуете в этом экзамене');
+    }
+
+    // Check attempt limit
+    const completedAttempts = await prisma.examSession.count({
+      where: {
+        studentId,
+        examId: exam.id,
+        status: { in: ['COMPLETED', 'COMPLETED_BY_TEACHER'] },
+      },
+    });
+
+    if (completedAttempts >= exam.maxAttempts) {
+      throw new Error(
+        `Вы исчерпали все попытки (${exam.maxAttempts}). Попыток использовано: ${completedAttempts}`
+      );
     }
 
     const session = await sessionRepository.create({
@@ -42,19 +103,60 @@ class SessionService {
   }
 
   async getSessionById(sessionId, user) {
-    const session = await sessionRepository.findById(sessionId);
+    const session = await prisma.examSession.findUnique({
+      where: { id: Number(sessionId) },
+      include: { exam: true, answers: true },
+    });
+
     if (!session) throw new Error('Сессия не найдена');
 
     if (user.role === 'STUDENT' && session.studentId !== user.id)
       throw new Error('Нет доступа к этой сессии');
 
+    // Add remaining time if session is active
+    if (session.status === 'ACTIVE' && session.exam.duration) {
+      const remainingTime = this.getRemainingTime(session);
+
+      // Auto-submit if time expired
+      if (remainingTime === 0 && this.isSessionExpired(session)) {
+        await this.finishExam(sessionId, session.studentId);
+        const updatedSession = await prisma.examSession.findUnique({
+          where: { id: Number(sessionId) },
+          include: { exam: true, answers: true },
+        });
+        return {
+          ...updatedSession,
+          remainingTimeMinutes: 0,
+          autoSubmitted: true,
+        };
+      }
+
+      return {
+        ...session,
+        remainingTimeMinutes: remainingTime,
+      };
+    }
+
     return session;
   }
 
   async submitAnswer(sessionId, studentId, { questionId, response }) {
-    const session = await sessionRepository.findById(sessionId);
+    const session = await prisma.examSession.findUnique({
+      where: { id: Number(sessionId) },
+      include: { exam: true },
+    });
+
     if (!session) throw new Error('Сессия не найдена');
     if (session.studentId !== studentId) throw new Error('Нет доступа');
+
+    // Check if time expired
+    if (this.isSessionExpired(session)) {
+      // Auto-submit the exam
+      await this.finishExam(sessionId, studentId);
+      throw new Error(
+        'Время экзамена истекло. Экзамен автоматически завершён.'
+      );
+    }
 
     if (session.locked) {
       throw new Error('Сессия заблокирована. Дождитесь разрешения учителя.');
@@ -64,6 +166,10 @@ class SessionService {
       throw new Error(
         'Вы временно заблокированы. Подождите окончания блокировки.'
       );
+    }
+
+    if (session.status !== 'ACTIVE') {
+      throw new Error('Сессия неактивна. Статус: ' + session.status);
     }
 
     return sessionRepository.submitAnswer(sessionId, questionId, response);
